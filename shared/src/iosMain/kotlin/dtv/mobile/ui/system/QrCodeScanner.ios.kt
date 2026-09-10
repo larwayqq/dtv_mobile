@@ -114,12 +114,12 @@ private class QrScannerViewController(
   }
 
   override fun captureOutput(
-    output: AVCaptureOutput?,
-    didOutputMetadataObjects: List<*>?,
-    fromConnection: AVCaptureConnection?,
+    output: AVCaptureOutput,
+    didOutputMetadataObjects: List<*>,
+    fromConnection: AVCaptureConnection,
   ) {
     val metadataObj = didOutputMetadataObjects
-      ?.firstOrNull() as? AVMetadataMachineReadableCodeObject
+      .firstOrNull() as? AVMetadataMachineReadableCodeObject
       ?: return
     if (metadataObj.type == AVMetadataObjectTypeQRCode) {
       val text = metadataObj.stringValue ?: return

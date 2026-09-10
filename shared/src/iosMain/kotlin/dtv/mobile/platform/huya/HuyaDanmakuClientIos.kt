@@ -76,6 +76,7 @@ class HuyaDanmakuClientIos(
             header("User-Agent", HuyaDanmakuProtocol.UA)
           },
         ) {
+          val session = this
           var lastBinaryAt = currentTimeMillis()
 
           send(Frame.Binary(fin = true, data = wsInfo.registerPayload))
@@ -97,7 +98,7 @@ class HuyaDanmakuClientIos(
               if (currentTimeMillis() - lastBinaryAt >= 18_000L) {
                 AppLog.w("DTV-Huya", "huya danmaku idle too long, reconnect roomId=$roomId")
                 runCatching {
-                  this@webSocket.close(CloseReason(CloseReason.Codes.NORMAL_GOING_AWAY, "idle reconnect"))
+                  session.close(CloseReason(CloseReason.Codes.NORMAL_GOING_AWAY, "idle reconnect"))
                 }
                 break
               }

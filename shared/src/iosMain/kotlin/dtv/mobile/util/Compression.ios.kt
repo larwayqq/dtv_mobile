@@ -1,16 +1,15 @@
 package dtv.mobile.util
 
-import kotlinx.cinterop.ByteVar
+import compression.COMPRESSION_ZLIB
+import compression.compression_decode_buffer
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.UByteVar
 import kotlinx.cinterop.allocArray
-import kotlinx.cinterop.convert
 import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.usePinned
 import platform.CoreFoundation.CFStringConvertEncodingToNSStringEncoding
 import platform.CoreFoundation.kCFStringEncodingGB_18030_2000
 import platform.Foundation.NSString
-import platform.Compression.COMPRESSION_ZLIB
-import platform.Compression.compression_decode_buffer
+import platform.Foundation.NSStringEncoding
 
 actual fun inflateZlibOrNull(data: ByteArray): ByteArray? {
   if (data.isEmpty()) return null
@@ -54,23 +53,23 @@ actual fun gunzipOrNull(data: ByteArray): ByteArray? {
 private fun inflateRawOrNull(raw: ByteArray): ByteArray? {
   if (raw.isEmpty()) return null
   return memScoped {
-    val src = allocArray<ByteVar>(raw.size)
-    for (i in raw.indices) src[i] = raw[i]
+    val src = allocArray<UByteVar>(raw.size)
+    for (i in raw.indices) src[i] = raw[i].toUByte()
 
     var capacity = (raw.size * 6).coerceAtLeast(1024)
     repeat(8) {
-      val dst = allocArray<ByteVar>(capacity)
+      val dst = allocArray<UByteVar>(capacity)
       val written = compression_decode_buffer(
         dst,
-        capacity.convert(),
+        capacity.toULong(),
         src,
-        raw.size.convert(),
+        raw.size.toULong(),
         null,
-        0u.convert(),
+        0u,
         COMPRESSION_ZLIB,
       ).toLong()
       if (written in 1 until capacity.toLong()) {
-        return@memScoped ByteArray(written.toInt()) { i -> dst[i] }
+        return@memScoped ByteArray(written.toInt()) { i -> dst[i].toByte() }
       }
       capacity *= 4
     }
@@ -91,15 +90,8 @@ actual fun decodeTextBestEffort(bytes: ByteArray): String {
   return if (gbkBad < utf8Bad) gbk else utf8
 }
 
-@OptIn(ExperimentalForeignApi::class)
-private fun decodeWithEncoding(bytes: ByteArray, encoding: UInt): String? {
+private fun decodeWithEncoding(bytes: ByteArray, encoding: NSStringEncoding): String? {
   if (bytes.isEmpty()) return ""
-  return bytes.usePinned { pinned ->
-    val ns = NSString.alloc().initWithBytes(
-      pinned.addressOf(0),
-      bytes.size.toULong(),
-      encoding,
-    )
-    ns as String
-  }
+  val nsData = bytes.toNSData()
+  return NSString(data = nsData, encoding = encoding) as String?
 }

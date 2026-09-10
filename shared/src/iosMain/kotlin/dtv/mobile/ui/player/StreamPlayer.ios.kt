@@ -5,7 +5,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.interop.UIKitView
 import androidx.compose.runtime.key
 import dtv.mobile.util.AppLog
-import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.useContents
 import platform.AVFoundation.AVLayerVideoGravityResizeAspect
@@ -16,7 +15,7 @@ import platform.AVFoundation.AVPlayerItemStatusFailed
 import platform.AVFoundation.AVPlayerLayer
 import platform.AVFoundation.AVURLAsset
 import platform.CoreGraphics.CGRectMake
-import platform.Foundation.NSKeyValueObservingOptionNew
+import platform.Foundation.NSTimer
 import platform.Foundation.NSURL
 import platform.UIKit.UIColor
 import platform.UIKit.UIView
@@ -25,7 +24,8 @@ import platform.UIKit.UIView
 private class PlayerContainerView : UIView(frame = CGRectMake(0.0, 0.0, 0.0, 0.0)) {
   private val playerLayer = AVPlayerLayer()
   private var player: AVPlayer? = null
-  private var observedItem: AVPlayerItem? = null
+  private var pollTimer: NSTimer? = null
+  private var aspectReported = false
   private var configuredUrl: String? = null
   private var onErrorCallback: ((String) -> Unit)? = null
   private var onAspectCallback: ((Float?) -> Unit)? = null
@@ -41,24 +41,25 @@ private class PlayerContainerView : UIView(frame = CGRectMake(0.0, 0.0, 0.0, 0.0
     playerLayer.frame = bounds
   }
 
-  override fun observeValueForKeyPath(
-    keyPath: String?,
-    ofObject: Any?,
-    change: Map<Any?, *>?,
-    context: COpaquePointer?,
-  ) {
-    val item = ofObject as? AVPlayerItem ?: return
-    when (keyPath) {
-      "status" -> {
-        if (item.status == AVPlayerItemStatusFailed) {
-          val msg = item.error?.localizedDescription ?: "播放失败"
-          AppLog.e("DTV-Player", "AVPlayer failed url=$configuredUrl msg=$msg")
-          onErrorCallback?.invoke(msg)
-        }
+  // The standard Kotlin/Native bindings do not expose the NSKeyValueObserving
+  // protocol, so item status / presentation size are polled with a timer
+  // instead of addObserver(forKeyPath:).
+  private fun startPolling(item: AVPlayerItem) {
+    pollTimer?.invalidate()
+    aspectReported = false
+    pollTimer = NSTimer.scheduledTimerWithTimeInterval(0.3, repeats = true) { _ ->
+      if (item.status == AVPlayerItemStatusFailed) {
+        val msg = item.error?.localizedDescription ?: "播放失败"
+        AppLog.e("DTV-Player", "AVPlayer failed url=$configuredUrl msg=$msg")
+        onErrorCallback?.invoke(msg)
+        pollTimer?.invalidate()
+        pollTimer = null
+        return@scheduledTimerWithTimeInterval
       }
-      "presentationSize" -> {
+      if (!aspectReported) {
         item.presentationSize.useContents {
           if (width > 0.0 && height > 0.0) {
+            aspectReported = true
             onAspectCallback?.invoke(width.toFloat() / height.toFloat())
           }
         }
@@ -99,19 +100,12 @@ private class PlayerContainerView : UIView(frame = CGRectMake(0.0, 0.0, 0.0, 0.0
       options = mapOf<Any?, Any?>("AVURLAssetHTTPHeaderFieldsKey" to headers),
     )
     val item = AVPlayerItem(asset = asset)
-    observedItem = item
-    item.addObserver(this, forKeyPath = "status", options = NSKeyValueObservingOptionNew, context = null)
-    item.addObserver(
-      this,
-      forKeyPath = "presentationSize",
-      options = NSKeyValueObservingOptionNew,
-      context = null,
-    )
 
     val p = AVPlayer(playerItem = item)
     player = p
     playerLayer.player = p
     p.play()
+    startPolling(item)
   }
 
   fun setZoomToFill(zoomToFill: Boolean) {
@@ -120,11 +114,8 @@ private class PlayerContainerView : UIView(frame = CGRectMake(0.0, 0.0, 0.0, 0.0
   }
 
   fun release() {
-    observedItem?.let { item ->
-      runCatching { item.removeObserver(this, forKeyPath = "status") }
-      runCatching { item.removeObserver(this, forKeyPath = "presentationSize") }
-    }
-    observedItem = null
+    pollTimer?.invalidate()
+    pollTimer = null
     player?.pause()
     playerLayer.player = null
     player = null

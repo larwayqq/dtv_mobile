@@ -14,11 +14,21 @@ kotlin {
       baseName = "shared"
       isStatic = true
     }
+    compilations.getByName("main") {
+      cinterops {
+        create("compression")
+      }
+    }
   }
   iosSimulatorArm64 {
     binaries.framework {
       baseName = "shared"
       isStatic = true
+    }
+    compilations.getByName("main") {
+      cinterops {
+        create("compression")
+      }
     }
   }
 

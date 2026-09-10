@@ -3,10 +3,10 @@ package dtv.mobile.sync
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import dtv.mobile.util.AppLog
+import dtv.mobile.util.toByteArray
+import dtv.mobile.util.toNSData
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.ObjCAction
-import kotlinx.cinterop.UIntVar
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.convert
@@ -29,11 +29,8 @@ import platform.Foundation.NSNetServiceBrowser
 import platform.Foundation.NSNetServiceBrowserDelegateProtocol
 import platform.Foundation.NSNetServiceDelegateProtocol
 import platform.Foundation.NSRunLoop
-import platform.Foundation.NSSelectorFromString
 import platform.Foundation.NSString
 import platform.Foundation.NSUTF8StringEncoding
-import platform.Foundation.toByteArray
-import platform.Foundation.toNSData
 import platform.Network.NW_CONNECTION_DEFAULT_MESSAGE_CONTEXT
 import platform.Network.nw_advertise_descriptor_create_bonjour_service
 import platform.Network.nw_advertise_descriptor_set_txt_record
@@ -57,17 +54,20 @@ import platform.Network.nw_parameters_create_secure_tcp
 import platform.Network.nw_connection_t
 import platform.Network.nw_listener_state_failed
 import platform.Network.nw_listener_t
+import platform.darwin.DISPATCH_TIME_NOW
 import platform.darwin.NSObject
+import platform.darwin.dispatch_after
 import platform.darwin.dispatch_get_main_queue
+import platform.darwin.dispatch_time
 import platform.posix.AF_INET
 import platform.posix.SOCK_DGRAM
 import platform.posix.close
 import platform.posix.connect
 import platform.posix.getsockname
-import platform.posix.htons
 import platform.posix.memset
 import platform.posix.sockaddr_in
 import platform.posix.socket
+import platform.posix.socklen_tVar
 import platform.posix.uname
 import platform.posix.utsname
 import kotlin.coroutines.resume
@@ -75,6 +75,10 @@ import kotlin.coroutines.resumeWithException
 
 private const val NSD_SERVICE_TYPE = "_dtv-lan-sync._tcp."
 private const val MAX_REQUEST_BYTES = 64 * 1024
+
+/** htons() is not exposed by Kotlin/Native's platform.posix on iOS. */
+private fun htonsPort(port: Int): UShort =
+  (((port and 0xFF) shl 8) or ((port shr 8) and 0xFF)).toUShort()
 
 private val serverJson = Json {
   ignoreUnknownKeys = true
@@ -150,7 +154,7 @@ private fun localIPv4Addresses(): List<String> {
       memset(remote.ptr, 0, sizeOf<sockaddr_in>().convert())
       remote.sin_len = sizeOf<sockaddr_in>().toUByte()
       remote.sin_family = AF_INET.toUByte()
-      remote.sin_port = htons(53.toUShort())
+      remote.sin_port = htonsPort(53)
       // 8.8.8.8 in network byte order; every byte is 0x08 so host order
       // does not matter for this particular constant.
       remote.sin_addr.s_addr = 0x08080808u
@@ -159,7 +163,7 @@ private fun localIPv4Addresses(): List<String> {
       }
       val local = alloc<sockaddr_in>()
       memset(local.ptr, 0, sizeOf<sockaddr_in>().convert())
-      val lenVar = alloc<UIntVar>()
+      val lenVar = alloc<socklen_tVar>()
       lenVar.value = sizeOf<sockaddr_in>().convert()
       if (getsockname(fd, local.ptr.reinterpret(), lenVar.ptr) != 0) {
         return@memScoped emptyList()
@@ -263,8 +267,8 @@ private class IosLanServer(
     val endpoint = nw_connection_copy_endpoint(connection) ?: return null
     val type = nw_endpoint_get_type(endpoint).toInt()
     if (type == nw_endpoint_type_address.toInt()) {
-      val address = nw_endpoint_copy_address_string(endpoint) ?: return null
-      val ip = stripPort(address)
+      val cstr = nw_endpoint_copy_address_string(endpoint) ?: return null
+      val ip = stripPort(cstr.toKString())
       if (ip.isNotBlank()) return ip
     }
     return null
@@ -453,8 +457,12 @@ private class DtvServiceBrowser : NSObject(), NSNetServiceBrowserDelegateProtoco
     b.scheduleInRunLoop(NSRunLoop.currentRunLoop, forMode = NSDefaultRunLoopMode)
     b.searchForServicesOfType(NSD_SERVICE_TYPE, inDomain = "")
 
-    NSObject.cancelPreviousPerformRequestsWithTarget(this)
-    performSelector(NSSelectorFromString("finishDiscovery"), withObject = null, afterDelay = timeoutMs / 1000.0)
+    dispatch_after(
+      dispatch_time(DISPATCH_TIME_NOW, timeoutMs * 1_000_000L),
+      dispatch_get_main_queue(),
+    ) {
+      finishDiscovery()
+    }
   }
 
   fun cancel() {
@@ -472,7 +480,6 @@ private class DtvServiceBrowser : NSObject(), NSNetServiceBrowserDelegateProtoco
     }
   }
 
-  @ObjCAction
   fun finishDiscovery() {
     cancel()
   }
@@ -495,7 +502,7 @@ private class DtvServiceBrowser : NSObject(), NSNetServiceBrowserDelegateProtoco
     val port = sender.port.toInt()
     if (port <= 0) return
 
-    val txt = runCatching { sender.TXTRecordData }.getOrNull()
+    val txt = runCatching { sender.TXTRecordData() }.getOrNull()
     val attrs: Map<*, *> = if (txt != null) {
       runCatching { NSNetService.dictionaryFromTXTRecordData(txt) }.getOrNull().orEmpty()
     } else emptyMap()
@@ -530,7 +537,7 @@ private class DtvServiceBrowser : NSObject(), NSNetServiceBrowserDelegateProtoco
     runCatching { sender.stop() }
   }
 
-  override fun netService(sender: NSNetService, didNotResolve: Map<Any?, *>?) {
+  override fun netService(sender: NSNetService, didNotResolveErrors: Map<Any?, *>?) {
     sender.name?.let { resolving.remove(it) }
   }
 }

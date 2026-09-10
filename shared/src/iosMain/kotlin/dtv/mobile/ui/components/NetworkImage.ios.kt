@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.interop.UIKitView
 import androidx.compose.ui.layout.ContentScale
 import dtv.mobile.util.AppLog
+import dtv.mobile.util.toNSData
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.darwin.Darwin
 import io.ktor.client.request.get
@@ -18,11 +19,9 @@ import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import platform.Foundation.NSCache
-import platform.Foundation.toNSData
 import platform.UIKit.UIImage
 import platform.UIKit.UIImageView
 import platform.UIKit.UIViewContentMode
-import platform.UIKit.contentMode
 
 private val imageClient: HttpClient by lazy { HttpClient(Darwin) }
 private val imageCache: NSCache by lazy {
@@ -64,10 +63,10 @@ actual fun NetworkImage(
   }
 
   val targetContentMode = when (contentScale) {
-    ContentScale.Crop -> UIViewContentMode.ScaleAspectFill
-    ContentScale.Fit, ContentScale.Inside -> UIViewContentMode.ScaleAspectFit
-    ContentScale.FillBounds -> UIViewContentMode.ScaleToFill
-    else -> UIViewContentMode.ScaleAspectFill
+    ContentScale.Crop -> UIViewContentMode.UIViewContentModeScaleAspectFill
+    ContentScale.Fit, ContentScale.Inside -> UIViewContentMode.UIViewContentModeScaleAspectFit
+    ContentScale.FillBounds -> UIViewContentMode.UIViewContentModeScaleToFill
+    else -> UIViewContentMode.UIViewContentModeScaleAspectFill
   }
 
   UIKitView(

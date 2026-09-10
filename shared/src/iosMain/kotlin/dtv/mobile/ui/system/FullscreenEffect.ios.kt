@@ -46,10 +46,14 @@ private fun forceOrientation(landscape: Boolean) {
 
   // Legacy path (and still commonly honored on iOS 16/17 for simple apps).
   runCatching {
-    val deviceOrientation = if (landscape) UIDeviceOrientation.LandscapeRight else UIDeviceOrientation.Portrait
-    val interfaceOrientation = if (landscape) UIInterfaceOrientation.LandscapeRight else UIInterfaceOrientation.Portrait
-    UIDevice.currentDevice.setValue(NSNumber(long = deviceOrientation.value.toLong()), forKey = "orientation")
-    UIApplication.sharedApplication.setValue(NSNumber(long = interfaceOrientation.value.toLong()), forKey = "statusBarOrientation")
+    val deviceOrientation =
+      if (landscape) UIDeviceOrientation.UIDeviceOrientationLandscapeRight
+      else UIDeviceOrientation.UIDeviceOrientationPortrait
+    val interfaceOrientation =
+      if (landscape) UIInterfaceOrientation.UIInterfaceOrientationLandscapeRight
+      else UIInterfaceOrientation.UIInterfaceOrientationPortrait
+    UIDevice.currentDevice.setValue(NSNumber.numberWithLong(deviceOrientation.value), forKey = "orientation")
+    UIApplication.sharedApplication.setValue(NSNumber.numberWithLong(interfaceOrientation.value), forKey = "statusBarOrientation")
   }.onFailure { AppLog.w("DTV-Fullscreen", "setValue orientation failed: ${it.message}") }
 }
 
