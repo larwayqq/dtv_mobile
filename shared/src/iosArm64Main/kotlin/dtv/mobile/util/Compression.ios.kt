@@ -13,6 +13,11 @@ import kotlinx.cinterop.usePinned
 import platform.CoreFoundation.CFStringCreateWithBytes
 import platform.CoreFoundation.kCFStringEncodingGB_18030_2000
 
+// Lives in the iosArm64 leaf source set on purpose: cinterop declarations are
+// directly visible here without cinterop commonization (the project wires its
+// iosMain source set manually, so the intermediate source set cannot see the
+// `compression` package). Only the on-device arm64 target is shipped.
+
 actual fun inflateZlibOrNull(data: ByteArray): ByteArray? {
   if (data.isEmpty()) return null
   // libcompression speaks raw deflate: strip the 2-byte zlib header and 4-byte adler trailer.
@@ -83,7 +88,7 @@ actual fun decodeTextBestEffort(bytes: ByteArray): String {
   if (bytes.isEmpty()) return ""
   val utf8 = bytes.decodeToString()
   if (!utf8.contains('�')) return utf8
-  val gbk = decodeWithEncoding(bytes, kCFStringEncodingGB_18030_2000) ?: return utf8
+  val gbk = decodeWithEncoding(bytes, kCFStringEncodingGB_18030_2000.toUInt()) ?: return utf8
   val utf8Bad = utf8.count { it == '�' }
   val gbkBad = gbk.count { it == '�' }
   return if (gbkBad < utf8Bad) gbk else utf8

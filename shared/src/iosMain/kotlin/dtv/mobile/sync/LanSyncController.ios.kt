@@ -18,6 +18,7 @@ import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.usePinned
+import kotlinx.cinterop.value
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -501,11 +502,9 @@ private class DtvServiceBrowser : NSObject(), NSNetServiceBrowserDelegateProtoco
     if (port <= 0) return
 
     val txt = runCatching { sender.TXTRecordData() }.getOrNull()
-    val attrs: Map<*, *> = if (txt != null) {
-      runCatching { NSNetService.dictionaryFromTXTRecordData(txt) }.getOrNull() ?: emptyMap()
-    } else {
-      emptyMap()
-    }
+    val rawAttrs: Map<Any?, Any?>? =
+      if (txt != null) runCatching { NSNetService.dictionaryFromTXTRecordData(txt) }.getOrNull() else null
+    val attrs: Map<*, *> = rawAttrs ?: emptyMap<Any?, Any?>()
     fun attr(key: String): String? {
       val data = attrs[key] as? NSData ?: return null
       // Bonjour TXT record values are UTF-8 bytes.
