@@ -109,20 +109,15 @@ targets:
             tar -xf "$FW_DIR/compose-resources.tar" -C "$DEST"
             echo "extracted compose-resources.tar from framework"
           else
-            echo "searching for compose-resources artifacts..."
-            find "$SRCROOT/../shared/build" -name "compose-resources*" 2>/dev/null | head -40 || true
-            RES_TAR=$(find "$SRCROOT/../shared/build" -name "compose-resources.tar" -type f 2>/dev/null | head -1)
-            RES_DIR=$(find "$SRCROOT/../shared/build" -name "compose-resources" -type d 2>/dev/null | grep -v "$DEST" | head -1)
-            if [ -n "$RES_TAR" ]; then
-              mkdir -p "$DEST"
-              tar -xf "$RES_TAR" -C "$DEST"
-              echo "extracted $RES_TAR"
-            elif [ -n "$RES_DIR" ]; then
+            echo "no framework-bundled resources; falling back to composeResources source"
+            SRC_RES="$SRCROOT/../shared/src/commonMain/composeResources"
+            if [ -d "$SRC_RES" ]; then
               rm -rf "$DEST/compose-resources"
-              cp -R "$RES_DIR" "$DEST/compose-resources"
-              echo "copied $RES_DIR"
+              mkdir -p "$DEST/compose-resources"
+              cp -R "$SRC_RES/." "$DEST/compose-resources/"
+              echo "copied compose-resources from source"
             else
-              echo "ERROR: compose-resources artifact not found anywhere under shared/build"
+              echo "ERROR: compose-resources not found (neither build artifact nor source)"
               exit 1
             fi
           fi
