@@ -7,14 +7,10 @@ import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.cValue
 import platform.Foundation.NSOperatingSystemVersion
 import platform.Foundation.NSProcessInfo
-import platform.Foundation.NSNumber
 import platform.UIKit.UIApplication
-import platform.UIKit.UIDevice
-import platform.UIKit.UIDeviceOrientation
-import platform.UIKit.UIInterfaceOrientation
+import platform.UIKit.UISceneActivationStateForegroundActive
 import platform.UIKit.UIInterfaceOrientationMaskLandscapeRight
 import platform.UIKit.UIInterfaceOrientationMaskPortrait
-import platform.UIKit.UISceneActivationStateForegroundActive
 import platform.UIKit.UIWindowScene
 import platform.UIKit.UIWindowSceneGeometryPreferencesIOS
 
@@ -30,31 +26,20 @@ private fun isIosAtLeast(major: Int): Boolean {
 
 @OptIn(ExperimentalForeignApi::class)
 private fun forceOrientation(landscape: Boolean) {
-  // iOS 16+: geometry update API on the active window scene.
-  if (isIosAtLeast(16)) {
-    runCatching {
-      val scene = UIApplication.sharedApplication.connectedScenes
-        .mapNotNull { it as? UIWindowScene }
-        .firstOrNull { it.activationState == UISceneActivationStateForegroundActive }
-      if (scene != null) {
-        val mask = if (landscape) UIInterfaceOrientationMaskLandscapeRight else UIInterfaceOrientationMaskPortrait
-        val prefs = UIWindowSceneGeometryPreferencesIOS(interfaceOrientations = mask)
-        scene.requestGeometryUpdateWithPreferences(prefs, null)
-      }
-    }.onFailure { AppLog.w("DTV-Fullscreen", "geometry update failed: ${it.message}") }
-  }
-
-  // Legacy path (and still commonly honored on iOS 16/17 for simple apps).
+  // iOS 16+ geometry update API on the active window scene (target devices
+  // all run iOS 16+; the legacy UIDevice KVC path is unavailable in
+  // Kotlin/Native bindings).
+  if (!isIosAtLeast(16)) return
   runCatching {
-    val deviceOrientation =
-      if (landscape) UIDeviceOrientation.UIDeviceOrientationLandscapeRight
-      else UIDeviceOrientation.UIDeviceOrientationPortrait
-    val interfaceOrientation =
-      if (landscape) UIInterfaceOrientation.UIInterfaceOrientationLandscapeRight
-      else UIInterfaceOrientation.UIInterfaceOrientationPortrait
-    UIDevice.currentDevice.setValue(NSNumber.numberWithLong(deviceOrientation.value), forKey = "orientation")
-    UIApplication.sharedApplication.setValue(NSNumber.numberWithLong(interfaceOrientation.value), forKey = "statusBarOrientation")
-  }.onFailure { AppLog.w("DTV-Fullscreen", "setValue orientation failed: ${it.message}") }
+    val scene = UIApplication.sharedApplication.connectedScenes
+      .mapNotNull { it as? UIWindowScene }
+      .firstOrNull { it.activationState == UISceneActivationStateForegroundActive }
+    if (scene != null) {
+      val mask = if (landscape) UIInterfaceOrientationMaskLandscapeRight else UIInterfaceOrientationMaskPortrait
+      val prefs = UIWindowSceneGeometryPreferencesIOS(interfaceOrientations = mask)
+      scene.requestGeometryUpdateWithPreferences(prefs, null)
+    }
+  }.onFailure { AppLog.w("DTV-Fullscreen", "geometry update failed: ${it.message}") }
 }
 
 @Composable

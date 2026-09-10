@@ -14,6 +14,9 @@ import platform.AVFoundation.AVPlayerItem
 import platform.AVFoundation.AVPlayerItemStatusFailed
 import platform.AVFoundation.AVPlayerLayer
 import platform.AVFoundation.AVURLAsset
+import platform.AVFoundation.pause
+import platform.AVFoundation.play
+import platform.AVFoundation.presentationSize
 import platform.CoreGraphics.CGRectMake
 import platform.Foundation.NSTimer
 import platform.Foundation.NSURL

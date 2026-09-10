@@ -2,14 +2,16 @@ package dtv.mobile.util
 
 import compression.COMPRESSION_ZLIB
 import compression.compression_decode_buffer
+import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.UByteVar
+import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.allocArray
+import kotlinx.cinterop.convert
 import kotlinx.cinterop.memScoped
-import platform.CoreFoundation.CFStringConvertEncodingToNSStringEncoding
+import kotlinx.cinterop.reinterpret
+import kotlinx.cinterop.usePinned
+import platform.CoreFoundation.CFStringCreateWithBytes
 import platform.CoreFoundation.kCFStringEncodingGB_18030_2000
-import platform.Foundation.NSString
-import platform.Foundation.NSStringEncoding
 
 actual fun inflateZlibOrNull(data: ByteArray): ByteArray? {
   if (data.isEmpty()) return null
@@ -53,23 +55,23 @@ actual fun gunzipOrNull(data: ByteArray): ByteArray? {
 private fun inflateRawOrNull(raw: ByteArray): ByteArray? {
   if (raw.isEmpty()) return null
   return memScoped {
-    val src = allocArray<UByteVar>(raw.size)
-    for (i in raw.indices) src[i] = raw[i].toUByte()
+    val src = allocArray<ByteVar>(raw.size)
+    for (i in raw.indices) src[i] = raw[i]
 
     var capacity = (raw.size * 6).coerceAtLeast(1024)
     repeat(8) {
-      val dst = allocArray<UByteVar>(capacity)
+      val dst = allocArray<ByteVar>(capacity)
       val written = compression_decode_buffer(
-        dst,
+        dst.reinterpret(),
         capacity.toULong(),
-        src,
+        src.reinterpret(),
         raw.size.toULong(),
         null,
         0u,
         COMPRESSION_ZLIB,
       ).toLong()
       if (written in 1 until capacity.toLong()) {
-        return@memScoped ByteArray(written.toInt()) { i -> dst[i].toByte() }
+        return@memScoped ByteArray(written.toInt()) { i -> dst[i] }
       }
       capacity *= 4
     }
@@ -81,17 +83,23 @@ actual fun decodeTextBestEffort(bytes: ByteArray): String {
   if (bytes.isEmpty()) return ""
   val utf8 = bytes.decodeToString()
   if (!utf8.contains('�')) return utf8
-  val gbk = decodeWithEncoding(
-    bytes,
-    CFStringConvertEncodingToNSStringEncoding(kCFStringEncodingGB_18030_2000),
-  ) ?: return utf8
+  val gbk = decodeWithEncoding(bytes, kCFStringEncodingGB_18030_2000) ?: return utf8
   val utf8Bad = utf8.count { it == '�' }
   val gbkBad = gbk.count { it == '�' }
   return if (gbkBad < utf8Bad) gbk else utf8
 }
 
-private fun decodeWithEncoding(bytes: ByteArray, encoding: NSStringEncoding): String? {
+@OptIn(ExperimentalForeignApi::class)
+private fun decodeWithEncoding(bytes: ByteArray, encoding: UInt): String? {
   if (bytes.isEmpty()) return ""
-  val nsData = bytes.toNSData()
-  return NSString(data = nsData, encoding = encoding) as String?
+  bytes.usePinned { pinned ->
+    val cfString = CFStringCreateWithBytes(
+      null,
+      pinned.addressOf(0).reinterpret(),
+      bytes.size.convert(),
+      encoding,
+      false,
+    )
+    return cfString as String?
+  }
 }

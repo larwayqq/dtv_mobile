@@ -10,8 +10,8 @@ import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.useContents
 import platform.CoreGraphics.CGAffineTransformMakeScale
 import platform.CoreImage.CIContext
-import platform.CoreImage.CIFilter
 import platform.CoreImage.CIImage
+import platform.CoreImage.CIQRCodeGenerator
 import platform.UIKit.UIImage
 import platform.UIKit.UIImageView
 import platform.UIKit.UIViewContentMode
@@ -21,9 +21,9 @@ private const val QR_PIXEL_SIZE = 512.0
 @OptIn(ExperimentalForeignApi::class)
 private fun generateQrImage(data: String): UIImage? {
   return try {
-    val filter = CIFilter.filterWithName("CIQRCodeGenerator") ?: return null
-    filter.setValue(data.encodeToByteArray().toNSData(), forKey = "inputMessage")
-    filter.setValue("M", forKey = "inputCorrectionLevel")
+    val filter = CIQRCodeGenerator()
+    filter.inputMessage = data.encodeToByteArray().toNSData()
+    filter.inputCorrectionLevel = "M"
     val raw: CIImage = filter.outputImage ?: return null
 
     val width = raw.extent.useContents { size.width }

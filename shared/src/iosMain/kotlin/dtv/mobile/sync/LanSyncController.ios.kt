@@ -7,6 +7,7 @@ import dtv.mobile.util.toByteArray
 import dtv.mobile.util.toNSData
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.UIntVar
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.convert
@@ -29,8 +30,6 @@ import platform.Foundation.NSNetServiceBrowser
 import platform.Foundation.NSNetServiceBrowserDelegateProtocol
 import platform.Foundation.NSNetServiceDelegateProtocol
 import platform.Foundation.NSRunLoop
-import platform.Foundation.NSString
-import platform.Foundation.NSUTF8StringEncoding
 import platform.Network.NW_CONNECTION_DEFAULT_MESSAGE_CONTEXT
 import platform.Network.nw_advertise_descriptor_create_bonjour_service
 import platform.Network.nw_advertise_descriptor_set_txt_record
@@ -67,7 +66,6 @@ import platform.posix.getsockname
 import platform.posix.memset
 import platform.posix.sockaddr_in
 import platform.posix.socket
-import platform.posix.socklen_tVar
 import platform.posix.uname
 import platform.posix.utsname
 import kotlin.coroutines.resume
@@ -163,9 +161,9 @@ private fun localIPv4Addresses(): List<String> {
       }
       val local = alloc<sockaddr_in>()
       memset(local.ptr, 0, sizeOf<sockaddr_in>().convert())
-      val lenVar = alloc<socklen_tVar>()
+      val lenVar = alloc<UIntVar>()
       lenVar.value = sizeOf<sockaddr_in>().convert()
-      if (getsockname(fd, local.ptr.reinterpret(), lenVar.ptr) != 0) {
+      if (getsockname(fd, local.ptr.reinterpret(), lenVar.ptr.reinterpret()) != 0) {
         return@memScoped emptyList()
       }
       val ip = formatIPv4(local.sin_addr.s_addr)
@@ -504,11 +502,14 @@ private class DtvServiceBrowser : NSObject(), NSNetServiceBrowserDelegateProtoco
 
     val txt = runCatching { sender.TXTRecordData() }.getOrNull()
     val attrs: Map<*, *> = if (txt != null) {
-      runCatching { NSNetService.dictionaryFromTXTRecordData(txt) }.getOrNull().orEmpty()
-    } else emptyMap()
+      runCatching { NSNetService.dictionaryFromTXTRecordData(txt) }.getOrNull() ?: emptyMap()
+    } else {
+      emptyMap()
+    }
     fun attr(key: String): String? {
       val data = attrs[key] as? NSData ?: return null
-      return NSString(data = data, encoding = NSUTF8StringEncoding) as String?
+      // Bonjour TXT record values are UTF-8 bytes.
+      return runCatching { data.toByteArray().decodeToString() }.getOrNull()
     }
     val kind = attr("kind")
     val path = attr("path")
@@ -535,10 +536,6 @@ private class DtvServiceBrowser : NSObject(), NSNetServiceBrowserDelegateProtoco
     peers[name] = peer
     resolving.remove(name)
     runCatching { sender.stop() }
-  }
-
-  override fun netService(sender: NSNetService, didNotResolveErrors: Map<Any?, *>?) {
-    sender.name?.let { resolving.remove(it) }
   }
 }
 
