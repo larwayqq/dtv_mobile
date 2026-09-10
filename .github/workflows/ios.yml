@@ -56,6 +56,10 @@ jobs:
           brew install xcodegen
           cd iosApp
           xcodegen generate
+          echo "===== framework bundle layout ====="
+          find ../shared/build/bin/iosArm64/releaseFramework -maxdepth 3 2>/dev/null | sort || true
+          echo "===== any compose-resources artifacts ====="
+          find ../shared/build -name "compose-resources*" 2>/dev/null | head -40 || true
 
       - name: Build app (no code signing)
         run: |

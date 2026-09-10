@@ -98,12 +98,31 @@ targets:
           set -e
           FW_DIR="$SRCROOT/../shared/build/bin/iosArm64/releaseFramework/shared.framework"
           DEST="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"
+          echo "FW_DIR=$FW_DIR"
+          ls -la "$FW_DIR" || true
           if [ -d "$FW_DIR/compose-resources" ]; then
             rm -rf "$DEST/compose-resources"
             cp -R "$FW_DIR/compose-resources" "$DEST/compose-resources"
-            echo "copied compose-resources directory"
-          fi
-          if [ -f "$FW_DIR/compose-resources.tar" ]; then
+            echo "copied compose-resources directory from framework"
+          elif [ -f "$FW_DIR/compose-resources.tar" ]; then
+            mkdir -p "$DEST"
             tar -xf "$FW_DIR/compose-resources.tar" -C "$DEST"
-            echo "extracted compose-resources.tar"
+            echo "extracted compose-resources.tar from framework"
+          else
+            echo "searching for compose-resources artifacts..."
+            find "$SRCROOT/../shared/build" -name "compose-resources*" 2>/dev/null | head -40 || true
+            RES_TAR=$(find "$SRCROOT/../shared/build" -name "compose-resources.tar" -type f 2>/dev/null | head -1)
+            RES_DIR=$(find "$SRCROOT/../shared/build" -name "compose-resources" -type d 2>/dev/null | grep -v "$DEST" | head -1)
+            if [ -n "$RES_TAR" ]; then
+              mkdir -p "$DEST"
+              tar -xf "$RES_TAR" -C "$DEST"
+              echo "extracted $RES_TAR"
+            elif [ -n "$RES_DIR" ]; then
+              rm -rf "$DEST/compose-resources"
+              cp -R "$RES_DIR" "$DEST/compose-resources"
+              echo "copied $RES_DIR"
+            else
+              echo "ERROR: compose-resources artifact not found anywhere under shared/build"
+              exit 1
+            fi
           fi
