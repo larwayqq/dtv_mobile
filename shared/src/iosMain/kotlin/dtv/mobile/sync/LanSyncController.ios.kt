@@ -4,20 +4,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import dtv.mobile.util.AppLog
 import kotlinx.cinterop.BetaInteropApi
-import kotlinx.cinterop.ByteVar
-import kotlinx.cinterop.CPointerVar
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ObjCAction
+import kotlinx.cinterop.UIntVar
 import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.alloc
-import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.convert
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.reinterpret
+import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.toKString
-import kotlinx.cinterop.toByteArray
 import kotlinx.cinterop.usePinned
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -30,11 +28,12 @@ import platform.Foundation.NSNetService
 import platform.Foundation.NSNetServiceBrowser
 import platform.Foundation.NSNetServiceBrowserDelegateProtocol
 import platform.Foundation.NSNetServiceDelegateProtocol
-import platform.Foundation.NSObject
 import platform.Foundation.NSRunLoop
 import platform.Foundation.NSSelectorFromString
 import platform.Foundation.NSString
 import platform.Foundation.NSUTF8StringEncoding
+import platform.Foundation.toByteArray
+import platform.Foundation.toNSData
 import platform.Network.NW_CONNECTION_DEFAULT_MESSAGE_CONTEXT
 import platform.Network.nw_advertise_descriptor_create_bonjour_service
 import platform.Network.nw_advertise_descriptor_set_txt_record
@@ -45,7 +44,6 @@ import platform.Network.nw_connection_send
 import platform.Network.nw_connection_set_queue
 import platform.Network.nw_connection_start
 import platform.Network.nw_endpoint_copy_address_string
-import platform.Network.nw_endpoint_copy_hostport_host
 import platform.Network.nw_endpoint_get_type
 import platform.Network.nw_endpoint_type_address
 import platform.Network.nw_listener_cancel
@@ -58,19 +56,18 @@ import platform.Network.nw_listener_start
 import platform.Network.nw_parameters_create_secure_tcp
 import platform.Network.nw_connection_t
 import platform.Network.nw_listener_state_failed
-import platform.Network.nw_listener_state_ready
 import platform.Network.nw_listener_t
-import platform.dispatch.dispatch_data_create
-import platform.dispatch.dispatch_get_main_queue
+import platform.darwin.NSObject
+import platform.darwin.dispatch_get_main_queue
 import platform.posix.AF_INET
-import platform.posix.IFF_LOOPBACK
-import platform.posix.INET_ADDRSTRLEN
-import platform.posix.free
-import platform.posix.freeifaddrs
-import platform.posix.getifaddrs
-import platform.posix.ifaddrs
-import platform.posix.inet_ntop
+import platform.posix.SOCK_DGRAM
+import platform.posix.close
+import platform.posix.connect
+import platform.posix.getsockname
+import platform.posix.htons
+import platform.posix.memset
 import platform.posix.sockaddr_in
+import platform.posix.socket
 import platform.posix.uname
 import platform.posix.utsname
 import kotlin.coroutines.resume
@@ -131,35 +128,48 @@ private fun stripPort(addressOrHost: String): String {
   return addressOrHost.substringBefore(":")
 }
 
+/** Formats an IPv4 address held in network byte order (sin_addr.s_addr). */
+private fun formatIPv4(sAddr: UInt): String {
+  val a = (sAddr and 0xFFu).toInt()
+  val b = ((sAddr shr 8) and 0xFFu).toInt()
+  val c = ((sAddr shr 16) and 0xFFu).toInt()
+  val d = ((sAddr shr 24) and 0xFFu).toInt()
+  return "$a.$b.$c.$d"
+}
+
 @OptIn(ExperimentalForeignApi::class)
 private fun localIPv4Addresses(): List<String> {
-  val out = ArrayList<String>()
-  memScoped {
-    val head = alloc<CPointerVar<ifaddrs>>()
-    if (getifaddrs(head.ptr) != 0) return@memScoped
-    var cursor = head.value
-    while (cursor != null) {
-      val item = cursor.pointed
-      val addrPtr = item.ifa_addr
-      val flags = item.ifa_flags.toInt()
-      if (addrPtr != null && (flags and IFF_LOOPBACK) == 0) {
-        if (addrPtr.pointed.sa_family.toInt() == AF_INET &&
-          item.ifa_name?.toKString()?.startsWith("en") == true
-        ) {
-          val sinPtr = addrPtr.reinterpret<sockaddr_in>()
-          // sin_addr lives at offset 4 of sockaddr_in (sin_len + sin_family + sin_port).
-          val inAddrPtr = sinPtr.reinterpret<ByteVar>().plus(4).reinterpret<platform.posix.in_addr>()
-          val buf = allocArray<ByteVar>(INET_ADDRSTRLEN)
-          inet_ntop(AF_INET, inAddrPtr, buf, INET_ADDRSTRLEN.toULong())?.toKString()?.let { ip ->
-            if (ip !in out) out.add(ip)
-          }
-        }
+  // A UDP connect() sends no packets; the kernel only selects the source
+  // address that would route toward the target. getifaddrs is not exposed
+  // by Kotlin/Native's platform.posix on iOS.
+  return memScoped {
+    val fd = socket(AF_INET, SOCK_DGRAM, 0)
+    if (fd < 0) return@memScoped emptyList()
+    try {
+      val remote = alloc<sockaddr_in>()
+      memset(remote.ptr, 0, sizeOf<sockaddr_in>().convert())
+      remote.sin_len = sizeOf<sockaddr_in>().toUByte()
+      remote.sin_family = AF_INET.toUByte()
+      remote.sin_port = htons(53.toUShort())
+      // 8.8.8.8 in network byte order; every byte is 0x08 so host order
+      // does not matter for this particular constant.
+      remote.sin_addr.s_addr = 0x08080808u
+      if (connect(fd, remote.ptr.reinterpret(), sizeOf<sockaddr_in>().convert()) != 0) {
+        return@memScoped emptyList()
       }
-      cursor = item.ifa_next
+      val local = alloc<sockaddr_in>()
+      memset(local.ptr, 0, sizeOf<sockaddr_in>().convert())
+      val lenVar = alloc<UIntVar>()
+      lenVar.value = sizeOf<sockaddr_in>().convert()
+      if (getsockname(fd, local.ptr.reinterpret(), lenVar.ptr) != 0) {
+        return@memScoped emptyList()
+      }
+      val ip = formatIPv4(local.sin_addr.s_addr)
+      if (isPrivateIPv4(ip)) listOf(ip) else emptyList()
+    } finally {
+      close(fd)
     }
-    freeifaddrs(head.value)
   }
-  return out
 }
 
 @OptIn(ExperimentalForeignApi::class)
@@ -195,14 +205,12 @@ private fun buildTxtRecord(token: String): ByteArray {
 @OptIn(ExperimentalForeignApi::class)
 private fun ipv4FromSockaddrData(data: NSData): String? = memScoped {
   val length = data.length.toLong()
-  if (length < 16L) return@memScoped null
+  if (length < 8L) return@memScoped null
   val raw = data.bytes ?: return@memScoped null
   val saPtr = raw.reinterpret<platform.posix.sockaddr>()
   if (saPtr.pointed.sa_family.toInt() != AF_INET) return@memScoped null
-  val sinPtr = saPtr.reinterpret<sockaddr_in>()
-  val inAddrPtr = sinPtr.reinterpret<ByteVar>().plus(4).reinterpret<platform.posix.in_addr>()
-  val buf = allocArray<ByteVar>(INET_ADDRSTRLEN)
-  inet_ntop(AF_INET, inAddrPtr, buf, INET_ADDRSTRLEN.toULong())?.toKString()
+  val sin = saPtr.reinterpret<sockaddr_in>().pointed
+  formatIPv4(sin.sin_addr.s_addr)
 }
 
 @OptIn(ExperimentalForeignApi::class)
@@ -227,7 +235,7 @@ private class IosLanServer(
     if (descriptor != null) {
       val txt = buildTxtRecord(token)
       txt.usePinned { pinned ->
-        nw_advertise_descriptor_set_txt_record(descriptor, txt.size.toULong(), pinned.addressOf(0))
+        nw_advertise_descriptor_set_txt_record(descriptor, pinned.addressOf(0), txt.size.toULong())
       }
       nw_listener_set_advertise_descriptor(l, descriptor)
     }
@@ -255,19 +263,9 @@ private class IosLanServer(
     val endpoint = nw_connection_copy_endpoint(connection) ?: return null
     val type = nw_endpoint_get_type(endpoint).toInt()
     if (type == nw_endpoint_type_address.toInt()) {
-      val cstr = nw_endpoint_copy_address_string(endpoint)
-      if (cstr != null) {
-        val s = cstr.toKString()
-        free(cstr)
-        val ip = stripPort(s)
-        if (ip.isNotBlank()) return ip
-      }
-    }
-    val hostCStr = nw_endpoint_copy_hostport_host(endpoint)
-    if (hostCStr != null) {
-      val s = hostCStr.toKString()
-      free(hostCStr)
-      return stripPort(s)
+      val address = nw_endpoint_copy_address_string(endpoint) ?: return null
+      val ip = stripPort(address)
+      if (ip.isNotBlank()) return ip
     }
     return null
   }
@@ -378,26 +376,21 @@ private class IosLanServer(
     return header + body
   }
 
-  @OptIn(ExperimentalForeignApi::class)
   private fun sendResponseBytes(connection: nw_connection_t, bytes: ByteArray) {
-    bytes.usePinned { pinned ->
-      val data = dispatch_data_create(
-        pinned.addressOf(0),
-        bytes.size.toULong(),
-        dispatch_get_main_queue(),
-        null,
-      )
-      nw_connection_send(
-        connection,
-        data,
-        NW_CONNECTION_DEFAULT_MESSAGE_CONTEXT,
-        true,
-      ) { sendError ->
-        if (sendError != null) {
-          AppLog.w("DTV-LanSync", "send failed")
-        }
-        nw_connection_cancel(connection)
+    // NSData owns a copy of the bytes and toll-free bridges to dispatch_data_t,
+    // so Network.framework can read it asynchronously after this call returns.
+    @Suppress("USELESS_CAST")
+    val data = bytes.toNSData() as platform.darwin.dispatch_data_t
+    nw_connection_send(
+      connection,
+      data,
+      NW_CONNECTION_DEFAULT_MESSAGE_CONTEXT,
+      true,
+    ) { sendError ->
+      if (sendError != null) {
+        AppLog.w("DTV-LanSync", "send failed")
       }
+      nw_connection_cancel(connection)
     }
   }
 }
@@ -444,7 +437,7 @@ private class IosLanSyncController : LanSyncController {
   }
 }
 
-@OptIn(ExperimentalForeignApi::class)
+@OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
 private class DtvServiceBrowser : NSObject(), NSNetServiceBrowserDelegateProtocol, NSNetServiceDelegateProtocol {
   private val peers = LinkedHashMap<String, LanSyncDiscoveredPeer>()
   private val resolving = LinkedHashMap<String, NSNetService>()
@@ -497,19 +490,13 @@ private class DtvServiceBrowser : NSObject(), NSNetServiceBrowserDelegateProtoco
     didFindService.resolveWithTimeout(2.0)
   }
 
-  override fun netServiceBrowser(
-    browser: NSNetServiceBrowser,
-    didRemoveService: NSNetService,
-    moreComing: Boolean,
-  ) = Unit
-
   override fun netServiceDidResolveAddress(sender: NSNetService) {
     val name = sender.name ?: return
     val port = sender.port.toInt()
     if (port <= 0) return
 
     val txt = runCatching { sender.TXTRecordData }.getOrNull()
-    val attrs: Map<Any?, *> = if (txt != null) {
+    val attrs: Map<*, *> = if (txt != null) {
       runCatching { NSNetService.dictionaryFromTXTRecordData(txt) }.getOrNull().orEmpty()
     } else emptyMap()
     fun attr(key: String): String? {

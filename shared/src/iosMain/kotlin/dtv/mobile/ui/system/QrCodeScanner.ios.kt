@@ -30,8 +30,8 @@ import platform.UIKit.UISceneActivationStateForegroundActive
 import platform.UIKit.UIViewController
 import platform.UIKit.UIWindowScene
 import platform.UIKit.UIModalPresentationFullScreen
-import platform.dispatch.dispatch_async
-import platform.dispatch.dispatch_get_main_queue
+import platform.darwin.dispatch_async
+import platform.darwin.dispatch_get_main_queue
 
 @OptIn(ExperimentalForeignApi::class)
 private class QrScannerViewController(
@@ -92,7 +92,7 @@ private class QrScannerViewController(
   override fun viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
     previewLayer?.frame = view.bounds
-    closeButton?.frame = CGRectMake(16.0, 44.0, 80.0, 44.0)
+    closeButton?.setFrame(CGRectMake(16.0, 44.0, 80.0, 44.0))
   }
 
   override fun viewWillDisappear(animated: Boolean) {
@@ -140,6 +140,7 @@ private fun topViewController(): UIViewController? {
   return controller
 }
 
+@OptIn(ExperimentalForeignApi::class)
 @Composable
 actual fun rememberQrCodeScanLauncher(
   onResult: (String?) -> Unit,
@@ -147,22 +148,17 @@ actual fun rememberQrCodeScanLauncher(
   val currentCallback = rememberUpdatedState(onResult)
   return remember {
     launcher@{
-      AVCaptureDevice.requestAccessForMediaType(AVMediaTypeVideo) { granted ->
-        dispatch_async(dispatch_get_main_queue()) {
-          if (!granted) {
-            currentCallback.value(null)
-            return@dispatch_async
-          }
-          val presenter = topViewController()
-          if (presenter == null) {
-            currentCallback.value(null)
-            return@dispatch_async
-          }
-          val scanner = QrScannerViewController(onFinished = currentCallback.value)
-          scanner.modalPresentationStyle = UIModalPresentationFullScreen
-          presenter.presentViewController(scanner, animated = true, completion = null)
-        }
+      // Creating AVCaptureDeviceInput makes the system present the camera
+      // permission dialog automatically on first use (requestAccessForMediaType
+      // bindings are unavailable on the Xcode 16 SDK).
+      val presenter = topViewController()
+      if (presenter == null) {
+        currentCallback.value(null)
+        return@launcher
       }
+      val scanner = QrScannerViewController(onFinished = currentCallback.value)
+      scanner.modalPresentationStyle = UIModalPresentationFullScreen
+      presenter.presentViewController(scanner, animated = true, completion = null)
     }
   }
 }

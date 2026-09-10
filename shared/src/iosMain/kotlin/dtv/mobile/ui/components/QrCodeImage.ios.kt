@@ -5,14 +5,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.interop.toImageBitmap
+import androidx.compose.ui.graphics.toImageBitmap
 import dtv.mobile.util.AppLog
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.toNSData
+import kotlinx.cinterop.useContents
 import platform.CoreImage.CIContext
 import platform.CoreImage.CIFilter
 import platform.CoreImage.CIImage
 import platform.CoreGraphics.CGAffineTransformMakeScale
+import platform.Foundation.toNSData
 import platform.UIKit.UIImage
 
 private const val QR_PIXEL_SIZE = 512.0
@@ -25,7 +26,7 @@ actual fun QrCodeImage(
 ) {
   val bitmap: ImageBitmap? = remember(data) {
     try {
-      val filter = CIFilter.filterWithName("CIQRCodeGenerator")
+      val filter = CIFilter.filterWithName("CIQRCodeGenerator", withInputParameters = null)
         ?: return@remember null
       filter.setValue(data.encodeToByteArray().toNSData(), forKey = "inputMessage")
       filter.setValue("M", forKey = "inputCorrectionLevel")
@@ -39,7 +40,7 @@ actual fun QrCodeImage(
       val scaled = raw.imageByApplyingTransform(CGAffineTransformMakeScale(scale, scale))
 
       val ciContext = CIContext.contextWithOptions(null)
-      val cgImage = ciContext.createCGImage(scaled, fromRect = scaled.extent)
+      val cgImage = ciContext?.createCGImage(scaled, fromRect = scaled.extent)
         ?: return@remember null
       UIImage.imageWithCGImage(cgImage).toImageBitmap()
     } catch (e: Throwable) {

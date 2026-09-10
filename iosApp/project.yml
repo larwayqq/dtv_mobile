@@ -74,6 +74,7 @@ targets:
           - CFNetwork
           - -framework
           - Network
+          - -lcompression
           - -framework
           - SystemConfiguration
           - -framework

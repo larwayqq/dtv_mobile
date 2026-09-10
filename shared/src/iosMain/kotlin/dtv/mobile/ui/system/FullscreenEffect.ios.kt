@@ -10,12 +10,10 @@ import platform.Foundation.NSProcessInfo
 import platform.Foundation.NSNumber
 import platform.UIKit.UIApplication
 import platform.UIKit.UIDevice
-import platform.UIKit.UIDeviceOrientationLandscapeRight
-import platform.UIKit.UIDeviceOrientationPortrait
-import platform.UIKit.UIInterfaceOrientationLandscapeRight
+import platform.UIKit.UIDeviceOrientation
+import platform.UIKit.UIInterfaceOrientation
 import platform.UIKit.UIInterfaceOrientationMaskLandscapeRight
 import platform.UIKit.UIInterfaceOrientationMaskPortrait
-import platform.UIKit.UIInterfaceOrientationPortrait
 import platform.UIKit.UISceneActivationStateForegroundActive
 import platform.UIKit.UIWindowScene
 import platform.UIKit.UIWindowSceneGeometryPreferencesIOS
@@ -42,17 +40,16 @@ private fun forceOrientation(landscape: Boolean) {
         val mask = if (landscape) UIInterfaceOrientationMaskLandscapeRight else UIInterfaceOrientationMaskPortrait
         val prefs = UIWindowSceneGeometryPreferencesIOS(interfaceOrientations = mask)
         scene.requestGeometryUpdateWithPreferences(prefs, null)
-        scene.keyWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
       }
     }.onFailure { AppLog.w("DTV-Fullscreen", "geometry update failed: ${it.message}") }
   }
 
   // Legacy path (and still commonly honored on iOS 16/17 for simple apps).
   runCatching {
-    val deviceOrientation = if (landscape) UIDeviceOrientationLandscapeRight else UIDeviceOrientationPortrait
-    val interfaceOrientation = if (landscape) UIInterfaceOrientationLandscapeRight else UIInterfaceOrientationPortrait
-    UIDevice.currentDevice.setValue(NSNumber(long = deviceOrientation.value), forKey = "orientation")
-    UIApplication.sharedApplication.setValue(NSNumber(long = interfaceOrientation.value), forKey = "statusBarOrientation")
+    val deviceOrientation = if (landscape) UIDeviceOrientation.LandscapeRight else UIDeviceOrientation.Portrait
+    val interfaceOrientation = if (landscape) UIInterfaceOrientation.LandscapeRight else UIInterfaceOrientation.Portrait
+    UIDevice.currentDevice.setValue(NSNumber(long = deviceOrientation.value.toLong()), forKey = "orientation")
+    UIApplication.sharedApplication.setValue(NSNumber(long = interfaceOrientation.value.toLong()), forKey = "statusBarOrientation")
   }.onFailure { AppLog.w("DTV-Fullscreen", "setValue orientation failed: ${it.message}") }
 }
 

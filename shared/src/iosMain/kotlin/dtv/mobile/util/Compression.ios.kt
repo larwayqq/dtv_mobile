@@ -1,6 +1,7 @@
 package dtv.mobile.util
 
 import kotlinx.cinterop.ByteVar
+import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.convert
 import kotlinx.cinterop.memScoped
@@ -8,8 +9,8 @@ import kotlinx.cinterop.usePinned
 import platform.CoreFoundation.CFStringConvertEncodingToNSStringEncoding
 import platform.CoreFoundation.kCFStringEncodingGB_18030_2000
 import platform.Foundation.NSString
-import platform.compression.COMPRESSION_ZLIB
-import platform.compression.compression_decode_buffer
+import platform.Compression.COMPRESSION_ZLIB
+import platform.Compression.compression_decode_buffer
 
 actual fun inflateZlibOrNull(data: ByteArray): ByteArray? {
   if (data.isEmpty()) return null
@@ -49,6 +50,7 @@ actual fun gunzipOrNull(data: ByteArray): ByteArray? {
   return inflateRawOrNull(raw)
 }
 
+@OptIn(ExperimentalForeignApi::class)
 private fun inflateRawOrNull(raw: ByteArray): ByteArray? {
   if (raw.isEmpty()) return null
   return memScoped {
@@ -64,6 +66,7 @@ private fun inflateRawOrNull(raw: ByteArray): ByteArray? {
         src,
         raw.size.convert(),
         null,
+        0u.convert(),
         COMPRESSION_ZLIB,
       ).toLong()
       if (written in 1 until capacity.toLong()) {
@@ -79,14 +82,17 @@ actual fun decodeTextBestEffort(bytes: ByteArray): String {
   if (bytes.isEmpty()) return ""
   val utf8 = bytes.decodeToString()
   if (!utf8.contains('�')) return utf8
-  val gbk = decodeWithEncoding(bytes, CFStringConvertEncodingToNSStringEncoding(kCFStringEncodingGB_18030_2000))
-    ?: return utf8
+  val gbk = decodeWithEncoding(
+    bytes,
+    CFStringConvertEncodingToNSStringEncoding(kCFStringEncodingGB_18030_2000),
+  ) ?: return utf8
   val utf8Bad = utf8.count { it == '�' }
   val gbkBad = gbk.count { it == '�' }
   return if (gbkBad < utf8Bad) gbk else utf8
 }
 
-private fun decodeWithEncoding(bytes: ByteArray, encoding: ULong): String? {
+@OptIn(ExperimentalForeignApi::class)
+private fun decodeWithEncoding(bytes: ByteArray, encoding: UInt): String? {
   if (bytes.isEmpty()) return ""
   return bytes.usePinned { pinned ->
     val ns = NSString.alloc().initWithBytes(

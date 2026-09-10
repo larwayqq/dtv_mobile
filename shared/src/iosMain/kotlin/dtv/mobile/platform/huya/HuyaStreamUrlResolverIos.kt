@@ -43,7 +43,7 @@ class HuyaStreamUrlResolverIos(
 
   private fun enforceHttps(url: String): String = when {
     url.startsWith("https://") -> url
-    url.startsWith("http://") -> "https://${url.removePrefix("http://")}" }
+    url.startsWith("http://") -> "https://${url.removePrefix("http://")}"
     else -> url
   }
 

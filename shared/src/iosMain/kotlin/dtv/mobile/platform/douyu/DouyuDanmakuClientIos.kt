@@ -10,6 +10,7 @@ import io.ktor.client.request.header
 import io.ktor.websocket.Frame
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
@@ -64,7 +65,7 @@ class DouyuDanmakuClientIos {
     }
 
     var backoff = 1000L
-    while (isActive) {
+    while (currentCoroutineContext().isActive) {
       try {
         wsClient.webSocket(
           urlString = "wss://danmuproxy.douyu.com:8506/",

@@ -18,6 +18,7 @@ import io.ktor.websocket.Frame
 import kotlin.random.Random
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
@@ -103,7 +104,7 @@ class DouyinDanmakuClientIos(
     val hb = DouyinProtoLite.encodePushFrame(payloadType = "hb", logId = 0L, payload = ByteArray(0))
     var backoffMs = 1000L
 
-    while (isActive) {
+    while (currentCoroutineContext().isActive) {
       val primedCtx = withPrimedLock { primed[rid] }
 
       val init = runCatching { resolveRoomInit(webRid = rid, primedRoomId = primedCtx?.roomId) }
@@ -117,7 +118,7 @@ class DouyinDanmakuClientIos(
       }
 
       for (base in WS_BASES.shuffled(Random)) {
-        if (!isActive) break
+        if (!currentCoroutineContext().isActive) break
         val wsUrl = runCatching { buildWsUrl(base = base, init = init) }.getOrNull().orEmpty()
         if (wsUrl.isBlank()) continue
 

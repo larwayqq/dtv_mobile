@@ -15,6 +15,7 @@ import io.ktor.websocket.CloseReason
 import io.ktor.websocket.Frame
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
@@ -53,7 +54,7 @@ class HuyaDanmakuClientIos(
 
   fun observe(roomId: String): Flow<DanmakuMessage> = flow {
     var backoffMs = 1000L
-    while (isActive) {
+    while (currentCoroutineContext().isActive) {
       val wsInfo = runCatching { fetchWsInfo(roomId) }
         .onFailure { AppLog.e("DTV-Huya", "fetch huya ws info failed roomId=$roomId", it) }
         .getOrNull()
@@ -96,7 +97,7 @@ class HuyaDanmakuClientIos(
               if (currentTimeMillis() - lastBinaryAt >= 18_000L) {
                 AppLog.w("DTV-Huya", "huya danmaku idle too long, reconnect roomId=$roomId")
                 runCatching {
-                  close(CloseReason(CloseReason.Codes.NORMAL_GOING_AWAY, "idle reconnect"))
+                  this@webSocket.close(CloseReason(CloseReason.Codes.NORMAL_GOING_AWAY, "idle reconnect"))
                 }
                 break
               }

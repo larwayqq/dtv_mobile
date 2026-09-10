@@ -17,6 +17,7 @@ import io.ktor.websocket.Frame
 import kotlin.math.min
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
@@ -280,11 +281,11 @@ class BilibiliDanmakuClientIos(
     val heartbeatPacket = buildPacket(op = 2, body = ByteArray(0), ver = 1, seq = 1)
 
     var backoffMs = 1_200L
-    while (isActive) {
+    while (currentCoroutineContext().isActive) {
       var connectedOnce = false
 
       for (ep in info.endpoints) {
-        if (!isActive) break
+        if (!currentCoroutineContext().isActive) break
         val wsUrl = if (ep.wssPort == 443) "wss://${ep.host}/sub" else "wss://${ep.host}:${ep.wssPort}/sub"
         AppLog.i("DTV-Bilibili", "danmaku ws connecting url=$wsUrl roomId=$roomId(real=${info.roomId})")
 
@@ -342,7 +343,7 @@ class BilibiliDanmakuClientIos(
       }
 
       backoffMs = if (!connectedOnce) (backoffMs * 2).coerceAtMost(12_000L) else 1_600L
-      if (!isActive) break
+      if (!currentCoroutineContext().isActive) break
       delay(backoffMs)
     }
   }.buffer(capacity = 512, onBufferOverflow = BufferOverflow.DROP_OLDEST)

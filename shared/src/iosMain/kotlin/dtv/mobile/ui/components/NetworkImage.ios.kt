@@ -15,15 +15,13 @@ import io.ktor.client.engine.darwin.Darwin
 import io.ktor.client.request.get
 import io.ktor.client.statement.readBytes
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.toNSData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import platform.Foundation.NSCache
+import platform.Foundation.toNSData
 import platform.UIKit.UIImage
 import platform.UIKit.UIImageView
-import platform.UIKit.UIViewContentModeScaleAspectFill
-import platform.UIKit.UIViewContentModeScaleAspectFit
-import platform.UIKit.UIViewContentModeScaleToFill
+import platform.UIKit.UIViewContentMode
 import platform.UIKit.contentMode
 
 private val imageClient: HttpClient by lazy { HttpClient(Darwin) }
@@ -66,10 +64,10 @@ actual fun NetworkImage(
   }
 
   val targetContentMode = when (contentScale) {
-    ContentScale.Crop -> UIViewContentModeScaleAspectFill
-    ContentScale.Fit, ContentScale.Inside -> UIViewContentModeScaleAspectFit
-    ContentScale.FillBounds -> UIViewContentModeScaleToFill
-    else -> UIViewContentModeScaleAspectFill
+    ContentScale.Crop -> UIViewContentMode.ScaleAspectFill
+    ContentScale.Fit, ContentScale.Inside -> UIViewContentMode.ScaleAspectFit
+    ContentScale.FillBounds -> UIViewContentMode.ScaleToFill
+    else -> UIViewContentMode.ScaleAspectFill
   }
 
   UIKitView(

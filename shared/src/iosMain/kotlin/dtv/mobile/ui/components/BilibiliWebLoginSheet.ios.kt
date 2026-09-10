@@ -22,19 +22,20 @@ import androidx.compose.ui.interop.UIKitView
 import androidx.compose.ui.unit.dp
 import dtv.mobile.util.AppLog
 import kotlinx.cinterop.ExperimentalForeignApi
+import platform.CoreGraphics.CGRectMake
+import platform.darwin.NSObject
+import platform.darwin.dispatch_async
+import platform.darwin.dispatch_get_main_queue
 import platform.Foundation.NSHTTPCookie
-import platform.Foundation.NSObject
 import platform.Foundation.NSURL
 import platform.Foundation.NSURLRequest
-import platform.Foundation.WKWebsiteDataStore
 import platform.UIKit.UIViewAutoresizingFlexibleHeight
 import platform.UIKit.UIViewAutoresizingFlexibleWidth
 import platform.WebKit.WKNavigation
 import platform.WebKit.WKNavigationDelegateProtocol
 import platform.WebKit.WKWebView
 import platform.WebKit.WKWebViewConfiguration
-import platform.dispatch.dispatch_async
-import platform.dispatch.dispatch_get_main_queue
+import platform.WebKit.WKWebsiteDataStore
 
 private const val BILIBILI_LOGIN_URL = "https://passport.bilibili.com/login"
 private const val IOS_UA_WITH_SUFFIX =
@@ -117,11 +118,11 @@ actual fun BilibiliWebLoginSheet(
       )
 
       UIKitView(
-        factory = { container ->
+        factory = {
           val config = WKWebViewConfiguration()
-          val webView = WKWebView(frame = container.bounds, configuration = config).apply {
+          val webView = WKWebView(frame = CGRectMake(0.0, 0.0, 0.0, 0.0), configuration = config).apply {
             customUserAgent = IOS_UA_WITH_SUFFIX
-            navigationDelegate = navigationDelegate
+            this.navigationDelegate = navigationDelegate
             autoresizingMask = UIViewAutoresizingFlexibleWidth or UIViewAutoresizingFlexibleHeight
           }
           runCatching {
