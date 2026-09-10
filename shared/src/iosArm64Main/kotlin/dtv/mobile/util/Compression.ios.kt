@@ -39,7 +39,7 @@ private fun inflateAutoOrNull(data: ByteArray): ByteArray? {
       if (inflateInit2(stream.ptr, 47) != Z_OK) return null
       try {
         val chunkSize = (data.size * 6).coerceAtLeast(4096)
-        var status: Int
+        var status = -9
         data.usePinned { pinIn ->
           stream.next_in = pinIn.addressOf(0).reinterpret()
           stream.avail_in = data.size.toUInt()
