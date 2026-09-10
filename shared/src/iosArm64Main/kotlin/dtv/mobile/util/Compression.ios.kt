@@ -1,87 +1,73 @@
 package dtv.mobile.util
 
-import compression.COMPRESSION_ZLIB
-import compression.compression_decode_buffer
-import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.addressOf
-import kotlinx.cinterop.allocArray
+import kotlinx.cinterop.alloc
 import kotlinx.cinterop.convert
 import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.ptr
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.usePinned
 import platform.CoreFoundation.CFStringCreateWithBytes
 import platform.CoreFoundation.kCFStringEncodingGB_18030_2000
+import platform.zlib.Z_NO_FLUSH
+import platform.zlib.Z_OK
+import platform.zlib.Z_STREAM_END
+import platform.zlib.inflate
+import platform.zlib.inflateEnd
+import platform.zlib.inflateInit2
+import platform.zlib.z_stream
 
-// Lives in the iosArm64 leaf source set on purpose: cinterop declarations are
-// directly visible here without cinterop commonization (the project wires its
-// iosMain source set manually, so the intermediate source set cannot see the
-// `compression` package). Only the on-device arm64 target is shipped.
+// Lives in the iosArm64 leaf source set; only the on-device arm64 target is
+// shipped. Uses the prebuilt platform.zlib klib (no custom cinterop needed).
 
-actual fun inflateZlibOrNull(data: ByteArray): ByteArray? {
-  if (data.isEmpty()) return null
-  // libcompression speaks raw deflate: strip the 2-byte zlib header and 4-byte adler trailer.
-  val raw = if (data.size > 2 && ((data[0].toInt() and 0xFF) and 0x0F) == 0x08) {
-    data.copyOfRange(2, data.size - 4)
-  } else {
-    data
-  }
-  return inflateRawOrNull(raw) ?: inflateRawOrNull(data)
-}
+actual fun inflateZlibOrNull(data: ByteArray): ByteArray? = inflateAutoOrNull(data)
 
-actual fun gunzipOrNull(data: ByteArray): ByteArray? {
-  if (data.size < 18) return null
-  if ((data[0].toInt() and 0xFF) != 0x1F || (data[1].toInt() and 0xFF) != 0x8B) return null
-  var pos = 10
-  val flg = data[3].toInt() and 0xFF
-  if (flg and 0x04 != 0) {
-    // FEXTRA
-    if (pos + 2 > data.size) return null
-    val xlen = (data[pos].toInt() and 0xFF) or ((data[pos + 1].toInt() and 0xFF) shl 8)
-    pos += 2 + xlen
-  }
-  if (flg and 0x08 != 0) {
-    // FNAME
-    while (pos < data.size && data[pos].toInt() != 0) pos++
-    pos++
-  }
-  if (flg and 0x10 != 0) {
-    // FCOMMENT
-    while (pos < data.size && data[pos].toInt() != 0) pos++
-    pos++
-  }
-  if (flg and 0x02 != 0) pos += 2 // FHCRC
-  if (pos >= data.size - 8) return null
-  val raw = data.copyOfRange(pos, data.size - 8)
-  return inflateRawOrNull(raw)
-}
+actual fun gunzipOrNull(data: ByteArray): ByteArray? = inflateAutoOrNull(data)
 
+/**
+ * windowBits = 15 + 32 = 47 makes zlib auto-detect both zlib (RFC 1950) and
+ * gzip (RFC 1952) wrappers.
+ */
 @OptIn(ExperimentalForeignApi::class)
-private fun inflateRawOrNull(raw: ByteArray): ByteArray? {
-  if (raw.isEmpty()) return null
-  return memScoped {
-    val src = allocArray<ByteVar>(raw.size)
-    for (i in raw.indices) src[i] = raw[i]
-
-    var capacity = (raw.size * 6).coerceAtLeast(1024)
-    repeat(8) {
-      val dst = allocArray<ByteVar>(capacity)
-      val written = compression_decode_buffer(
-        dst.reinterpret(),
-        capacity.toULong(),
-        src.reinterpret(),
-        raw.size.toULong(),
-        null,
-        0u,
-        COMPRESSION_ZLIB,
-      ).toLong()
-      if (written in 1 until capacity.toLong()) {
-        return@memScoped ByteArray(written.toInt()) { i -> dst[i] }
+private fun inflateAutoOrNull(data: ByteArray): ByteArray? {
+  if (data.isEmpty()) return null
+  val chunks = ArrayList<ByteArray>()
+  try {
+    memScoped {
+      val stream = alloc<z_stream>()
+      if (inflateInit2(stream.ptr, 47) != Z_OK) return null
+      try {
+        val chunkSize = (data.size * 6).coerceAtLeast(4096)
+        var status: Int
+        data.usePinned { pinIn ->
+          stream.next_in = pinIn.addressOf(0).reinterpret()
+          stream.avail_in = data.size.toUInt()
+          do {
+            val chunk = ByteArray(chunkSize)
+            chunk.usePinned { pinOut ->
+              stream.next_out = pinOut.addressOf(0).reinterpret()
+              stream.avail_out = chunkSize.toUInt()
+              status = inflate(stream.ptr, Z_NO_FLUSH)
+              val produced = chunkSize - stream.avail_out.toInt()
+              if (produced > 0) chunks.add(chunk.copyOf(produced))
+            }
+          } while (status == Z_OK)
+        }
+        if (status != Z_STREAM_END) return null
+      } finally {
+        inflateEnd(stream.ptr)
       }
-      capacity *= 4
     }
-    null
+  } catch (e: Throwable) {
+    return null
   }
+  val total = chunks.sumOf { it.size }
+  if (total == 0) return null
+  val result = ByteArray(total)
+  var pos = 0
+  chunks.forEach { it.copyInto(result, pos); pos += it.size }
+  return result
 }
 
 actual fun decodeTextBestEffort(bytes: ByteArray): String {

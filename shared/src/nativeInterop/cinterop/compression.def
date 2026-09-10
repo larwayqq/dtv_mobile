@@ -1,4 +1,0 @@
-package = compression
-headers = compression.h
-compilerOpts = -framework Compression
-linkerOpts = -framework Compression
