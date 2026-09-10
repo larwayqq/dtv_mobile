@@ -508,7 +508,7 @@ private class DtvServiceBrowser : NSObject(), NSNetServiceBrowserDelegateProtoco
     val port = sender.port.toInt()
     if (port <= 0) return
 
-    val txt = runCatching { sender.TXTRecordData() }.getOrNull()
+    val txt = runCatching { sender.TXTRecordData }.getOrNull()
     val attrs: Map<Any?, *> = if (txt != null) {
       runCatching { NSNetService.dictionaryFromTXTRecordData(txt) }.getOrNull().orEmpty()
     } else emptyMap()

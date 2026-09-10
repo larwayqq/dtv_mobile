@@ -97,7 +97,7 @@ class HuyaStreamUrlResolverIos(
 
     val paramsT = 100L
     val sdkVersion = 2403051612L
-    val t13 = currentMillis()
+    val t13 = currentTimeMillis()
     val sdkSid = t13
 
     val uid = 1_400_000_000_000L + abs(Random.nextLong()) % 10_000_000_000L

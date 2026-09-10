@@ -301,8 +301,8 @@ class BilibiliDanmakuClientIos(
             launch {
               while (isActive) {
                 delay(30_000L)
-                runCatching { send(Frame.Binary(fin = true, data = heartbeatPacket)) }
-                  .onFailure { break }
+                val sent = runCatching { send(Frame.Binary(fin = true, data = heartbeatPacket)) }.isSuccess
+                if (!sent) break
               }
             }
 

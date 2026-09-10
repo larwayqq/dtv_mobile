@@ -84,8 +84,8 @@ class HuyaDanmakuClientIos(
             while (isActive) {
               hb += 1
               delay(20_000L)
-              runCatching { send(Frame.Binary(fin = true, data = HuyaDanmakuProtocol.HEARTBEAT)) }
-                .onFailure { break }
+              val sent = runCatching { send(Frame.Binary(fin = true, data = HuyaDanmakuProtocol.HEARTBEAT)) }.isSuccess
+              if (!sent) break
             }
           }
 

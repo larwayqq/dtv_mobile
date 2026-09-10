@@ -78,8 +78,8 @@ class DouyuDanmakuClientIos {
           launch {
             while (isActive) {
               delay(45_000L)
-              runCatching { send(Frame.Binary(fin = true, data = encode("type@=mrkl/"))) }
-                .onFailure { break }
+              val sent = runCatching { send(Frame.Binary(fin = true, data = encode("type@=mrkl/"))) }.isSuccess
+              if (!sent) break
             }
           }
 

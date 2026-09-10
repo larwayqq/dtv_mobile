@@ -28,7 +28,7 @@ private class PlayerContainerView : UIView(frame = CGRectMake(0.0, 0.0, 0.0, 0.0
 
   init {
     backgroundColor = UIColor.blackColor
-    setOpaque(true)
+    opaque = true
     layer.addSublayer(playerLayer)
   }
 

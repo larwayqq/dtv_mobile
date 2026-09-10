@@ -138,7 +138,8 @@ class DouyinDanmakuClientIos(
 
             launch {
               while (isActive) {
-                runCatching { send(Frame.Binary(fin = true, data = hb)) }.onFailure { break }
+                val sent = runCatching { send(Frame.Binary(fin = true, data = hb)) }.isSuccess
+                if (!sent) break
                 delay(HEARTBEAT_MS)
               }
             }

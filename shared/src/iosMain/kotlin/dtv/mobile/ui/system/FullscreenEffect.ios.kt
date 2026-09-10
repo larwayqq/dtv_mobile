@@ -41,7 +41,7 @@ private fun forceOrientation(landscape: Boolean) {
       if (scene != null) {
         val mask = if (landscape) UIInterfaceOrientationMaskLandscapeRight else UIInterfaceOrientationMaskPortrait
         val prefs = UIWindowSceneGeometryPreferencesIOS(interfaceOrientations = mask)
-        scene.requestGeometryUpdate(prefs, null)
+        scene.requestGeometryUpdateWithPreferences(prefs, null)
         scene.keyWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
       }
     }.onFailure { AppLog.w("DTV-Fullscreen", "geometry update failed: ${it.message}") }
