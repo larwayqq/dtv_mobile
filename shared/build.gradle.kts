@@ -9,6 +9,19 @@ plugins {
 kotlin {
   androidTarget()
 
+  iosArm64 {
+    binaries.framework {
+      baseName = "shared"
+      isStatic = true
+    }
+  }
+  iosSimulatorArm64 {
+    binaries.framework {
+      baseName = "shared"
+      isStatic = true
+    }
+  }
+
   sourceSets {
     val commonMain by getting {
       dependencies {
@@ -18,6 +31,7 @@ kotlin {
         implementation(compose.material3)
         implementation(compose.materialIconsExtended)
         implementation(compose.ui)
+        implementation(compose.components.resources)
 
         implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
         implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
@@ -25,6 +39,7 @@ kotlin {
         val ktorVersion = "2.3.12"
         implementation("io.ktor:ktor-client-core:$ktorVersion")
         implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
+        implementation("io.ktor:ktor-client-websockets:$ktorVersion")
         implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
       }
     }
@@ -35,7 +50,6 @@ kotlin {
         implementation("io.ktor:ktor-client-cio:$ktorVersion")
         implementation("io.ktor:ktor-client-okhttp:$ktorVersion")
         implementation("io.ktor:ktor-client-logging:$ktorVersion")
-        implementation("io.ktor:ktor-client-websockets:$ktorVersion")
         implementation("io.ktor:ktor-server-core:$ktorVersion")
         implementation("io.ktor:ktor-server-cio:$ktorVersion")
         implementation("io.ktor:ktor-server-content-negotiation:$ktorVersion")
@@ -55,6 +69,17 @@ kotlin {
         implementation("androidx.media3:media3-ui:$media3Version")
       }
     }
+
+    val iosMain by creating {
+      dependsOn(commonMain)
+      dependencies {
+        val ktorVersion = "2.3.12"
+        implementation("io.ktor:ktor-client-darwin:$ktorVersion")
+      }
+    }
+
+    val iosArm64Main by getting { dependsOn(iosMain) }
+    val iosSimulatorArm64Main by getting { dependsOn(iosMain) }
   }
 }
 

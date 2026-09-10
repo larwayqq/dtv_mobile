@@ -1,24 +1,22 @@
 package dtv.mobile.platform.douyu
 
 import android.content.Context
+import dtv.mobile.util.readBundleAssetText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.mozilla.javascript.Context as RhinoContext
 import org.mozilla.javascript.Scriptable
 
 class DouyuJsSignerAndroid(
-  private val appContext: Context,
+  @Suppress("unused") private val appContext: Context,
 ) {
-  private val cryptoJs: String by lazy {
-    appContext.assets.open("douyu/cryptojs.min.js").bufferedReader(Charsets.UTF_8).use { it.readText() }
-  }
-
   suspend fun signParams(
     homeH5EncScript: String,
     roomId: String,
     did: String,
     tsSeconds: Long,
   ): String = withContext(Dispatchers.Default) {
+    val cryptoJs = readBundleAssetText("douyu/cryptojs.min.js")
     val ctx = RhinoContext.enter()
     try {
       // Android 上必须禁用优化，否则容易触发 bytecode 生成限制
@@ -53,4 +51,3 @@ private fun jsString(input: String): String {
   }
   return "\"$escaped\""
 }
-

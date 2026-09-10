@@ -1,6 +1,6 @@
 package dtv.mobile.platform.douyin
 
-import java.io.ByteArrayOutputStream
+import dtv.mobile.util.ByteOut
 
 internal object DouyinProtoLite {
   private const val WIRE_VARINT = 0
@@ -69,7 +69,7 @@ internal object DouyinProtoLite {
       return out
     }
 
-    fun readString(): String = readBytes().toString(Charsets.UTF_8)
+    fun readString(): String = readBytes().decodeToString()
 
     fun skip(wire: Int) {
       when (wire) {
@@ -84,40 +84,40 @@ internal object DouyinProtoLite {
     }
   }
 
-  private fun writeVarint(out: ByteArrayOutputStream, value: Long) {
+  private fun writeVarint(out: ByteOut, value: Long) {
     var v = value
     while (true) {
       val b = (v and 0x7F).toInt()
       v = v ushr 7
       if (v == 0L) {
-        out.write(b)
+        out.writeByte(b)
         return
       }
-      out.write(b or 0x80)
+      out.writeByte(b or 0x80)
     }
   }
 
-  private fun writeKey(out: ByteArrayOutputStream, fieldNumber: Int, wireType: Int) {
+  private fun writeKey(out: ByteOut, fieldNumber: Int, wireType: Int) {
     writeVarint(out, ((fieldNumber shl 3) or wireType).toLong())
   }
 
-  private fun writeLenField(out: ByteArrayOutputStream, fieldNumber: Int, bytes: ByteArray) {
+  private fun writeLenField(out: ByteOut, fieldNumber: Int, bytes: ByteArray) {
     writeKey(out, fieldNumber, WIRE_LEN)
     writeVarint(out, bytes.size.toLong())
     out.write(bytes)
   }
 
-  private fun writeStringField(out: ByteArrayOutputStream, fieldNumber: Int, value: String) {
-    writeLenField(out, fieldNumber, value.toByteArray(Charsets.UTF_8))
+  private fun writeStringField(out: ByteOut, fieldNumber: Int, value: String) {
+    writeLenField(out, fieldNumber, value.encodeToByteArray())
   }
 
-  private fun writeVarintField(out: ByteArrayOutputStream, fieldNumber: Int, value: Long) {
+  private fun writeVarintField(out: ByteOut, fieldNumber: Int, value: Long) {
     writeKey(out, fieldNumber, WIRE_VARINT)
     writeVarint(out, value)
   }
 
   internal fun encodePushFrame(payloadType: String, logId: Long, payload: ByteArray): ByteArray {
-    val out = ByteArrayOutputStream(64 + payload.size)
+    val out = ByteOut(64 + payload.size)
     // Only encode the few fields we need:
     // logId = 2, payloadType = 7, payload = 8
     writeVarintField(out, 2, logId)

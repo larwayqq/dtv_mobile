@@ -1,0 +1,109 @@
+name: DtvMobile
+options:
+  bundleIdPrefix: dtv
+  createIntermediateGroups: true
+  deploymentTarget:
+    iOS: "15.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    CLANG_ENABLE_MODULES: "YES"
+
+targets:
+  DtvMobile:
+    type: application
+    platform: iOS
+    deploymentTarget: "15.0"
+    sources:
+      - path: DtvApp
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dtv.mobile
+        INFOPLIST_FILE: DtvApp/Info.plist
+        MARKETING_VERSION: "0.1.1"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        IPHONEOS_DEPLOYMENT_TARGET: "15.0"
+        ENABLE_BITCODE: "NO"
+        CODE_SIGNING_ALLOWED: "NO"
+        CODE_SIGNING_REQUIRED: "NO"
+        CODE_SIGN_IDENTITY: ""
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: ""
+        FRAMEWORK_SEARCH_PATHS:
+          - $(inherited)
+          - $(SRCROOT)/../shared/build/bin/iosArm64/releaseFramework
+        OTHER_LDFLAGS:
+          - $(inherited)
+          - -framework
+          - shared
+          - -framework
+          - Foundation
+          - -framework
+          - UIKit
+          - -framework
+          - CoreFoundation
+          - -framework
+          - CoreGraphics
+          - -framework
+          - CoreText
+          - -framework
+          - CoreMedia
+          - -framework
+          - CoreVideo
+          - -framework
+          - CoreImage
+          - -framework
+          - QuartzCore
+          - -framework
+          - AVFoundation
+          - -framework
+          - AVKit
+          - -framework
+          - Metal
+          - -framework
+          - MetalKit
+          - -framework
+          - WebKit
+          - -framework
+          - JavaScriptCore
+          - -framework
+          - Security
+          - -framework
+          - CFNetwork
+          - -framework
+          - Network
+          - -framework
+          - SystemConfiguration
+          - -framework
+          - ImageIO
+          - -framework
+          - SafariServices
+          - -framework
+          - AuthenticationServices
+          - -framework
+          - Photos
+          - -framework
+          - PhotosUI
+          - -framework
+          - UniformTypeIdentifiers
+          - -lc++
+          - -lz
+    postBuildScripts:
+      - name: Copy Compose Multiplatform resources into app bundle
+        runOnlyWhenInstalling: false
+        shell: /bin/sh
+        script: |
+          set -e
+          FW_DIR="$SRCROOT/../shared/build/bin/iosArm64/releaseFramework/shared.framework"
+          DEST="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH"
+          if [ -d "$FW_DIR/compose-resources" ]; then
+            rm -rf "$DEST/compose-resources"
+            cp -R "$FW_DIR/compose-resources" "$DEST/compose-resources"
+            echo "copied compose-resources directory"
+          fi
+          if [ -f "$FW_DIR/compose-resources.tar" ]; then
+            tar -xf "$FW_DIR/compose-resources.tar" -C "$DEST"
+            echo "extracted compose-resources.tar"
+          fi

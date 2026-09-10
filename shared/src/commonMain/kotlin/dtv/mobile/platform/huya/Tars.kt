@@ -1,8 +1,6 @@
 package dtv.mobile.platform.huya
 
-import java.io.ByteArrayOutputStream
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
+import dtv.mobile.util.ByteOut
 
 /**
  * Minimal TARS/JCE codec, aligned with `huya-danmaku-kotlin`.
@@ -26,36 +24,30 @@ internal object Tars {
   data class Head(val tag: Int, val type: Int)
 
   class Output {
-    private val out = ByteArrayOutputStream()
+    private val out = ByteOut(256)
 
     fun toByteArray(): ByteArray = out.toByteArray()
 
     private fun writeHead(type: Int, tag: Int) {
       require(tag >= 0) { "tag must be >= 0" }
       if (tag < 15) {
-        out.write(((tag shl 4) or (type and 0x0f)) and 0xff)
+        out.writeByte(((tag shl 4) or (type and 0x0f)) and 0xff)
       } else {
-        out.write(((15 shl 4) or (type and 0x0f)) and 0xff)
-        out.write(tag and 0xff)
+        out.writeByte(((15 shl 4) or (type and 0x0f)) and 0xff)
+        out.writeByte(tag and 0xff)
       }
     }
 
     private fun writeI16(v: Short) {
-      val buf = ByteBuffer.allocate(2).order(ByteOrder.BIG_ENDIAN)
-      buf.putShort(v)
-      out.write(buf.array())
+      out.writeShortBe(v.toInt())
     }
 
     private fun writeI32Raw(v: Int) {
-      val buf = ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN)
-      buf.putInt(v)
-      out.write(buf.array())
+      out.writeIntBe(v)
     }
 
     private fun writeI64Raw(v: Long) {
-      val buf = ByteBuffer.allocate(8).order(ByteOrder.BIG_ENDIAN)
-      buf.putLong(v)
-      out.write(buf.array())
+      out.writeLongBe(v)
     }
 
     fun writeInt32(tag: Int, value: Int): Output {
@@ -63,7 +55,7 @@ internal object Tars {
         value == 0 -> writeHead(TYPE_ZERO_TAG, tag)
         value in -128..127 -> {
           writeHead(TYPE_BYTE, tag)
-          out.write((value and 0xff))
+          out.writeByte(value and 0xff)
         }
         value in -32768..32767 -> {
           writeHead(TYPE_SHORT, tag)
@@ -82,7 +74,7 @@ internal object Tars {
         value == 0L -> writeHead(TYPE_ZERO_TAG, tag)
         value in -128L..127L -> {
           writeHead(TYPE_BYTE, tag)
-          out.write((value.toInt() and 0xff))
+          out.writeByte((value.toInt() and 0xff))
         }
         value in -32768L..32767L -> {
           writeHead(TYPE_SHORT, tag)
@@ -101,10 +93,10 @@ internal object Tars {
     }
 
     fun writeString(tag: Int, value: String): Output {
-      val bytes = value.toByteArray(Charsets.UTF_8)
+      val bytes = value.encodeToByteArray()
       if (bytes.size < 255) {
         writeHead(TYPE_STRING1, tag)
-        out.write(bytes.size and 0xff)
+        out.writeByte(bytes.size and 0xff)
         out.write(bytes)
       } else {
         writeHead(TYPE_STRING4, tag)
@@ -139,19 +131,27 @@ internal object Tars {
     private fun readU8(): Int = data[pos++].toInt() and 0xff
 
     private fun readI16Raw(): Short {
-      val v = ByteBuffer.wrap(data, pos, 2).order(ByteOrder.BIG_ENDIAN).short
+      val v = (
+        ((data[pos].toInt() and 0xff) shl 8) or
+          (data[pos + 1].toInt() and 0xff)
+        ).toShort()
       pos += 2
       return v
     }
 
     private fun readI32Raw(): Int {
-      val v = ByteBuffer.wrap(data, pos, 4).order(ByteOrder.BIG_ENDIAN).int
+      val v =
+        ((data[pos].toInt() and 0xff) shl 24) or
+          ((data[pos + 1].toInt() and 0xff) shl 16) or
+          ((data[pos + 2].toInt() and 0xff) shl 8) or
+          (data[pos + 3].toInt() and 0xff)
       pos += 4
       return v
     }
 
     private fun readI64Raw(): Long {
-      val v = ByteBuffer.wrap(data, pos, 8).order(ByteOrder.BIG_ENDIAN).long
+      var v = 0L
+      for (i in 0 until 8) v = (v shl 8) or (data[pos + i].toLong() and 0xff)
       pos += 8
       return v
     }
@@ -161,10 +161,9 @@ internal object Tars {
       val b = data[pos].toInt() and 0xff
       val type = b and 0x0f
       var tag = (b ushr 4) and 0x0f
-      var p = pos + 1
       if (tag == 15) {
-        if (p >= data.size) return null
-        tag = data[p].toInt() and 0xff
+        if (pos + 1 >= data.size) return null
+        tag = data[pos + 1].toInt() and 0xff
       }
       return Head(tag, type)
     }
@@ -314,4 +313,3 @@ internal object Tars {
     }
   }
 }
-

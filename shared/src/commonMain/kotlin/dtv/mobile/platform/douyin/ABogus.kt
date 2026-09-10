@@ -244,7 +244,7 @@ private fun generateRc4BbStr(
   suffix: String,
   arguments: IntArray,
 ): String {
-  val startTime = System.currentTimeMillis()
+  val startTime = dtv.mobile.util.currentTimeMillis()
   val urlList = sm3Sum(sm3Sum((urlSearchParams + suffix).encodeToByteArray()))
   val cusOnce = sm3Sum(suffix.encodeToByteArray())
   val cus = sm3Sum(cusOnce)

@@ -1,70 +1,58 @@
-package dtv.mobile.repo.android
+package dtv.mobile.repo.ios
 
-import android.content.Context
-import dtv.mobile.util.AppLog
 import dtv.mobile.model.Platform
 import dtv.mobile.model.Streamer
 import dtv.mobile.net.createHttpClient
-import dtv.mobile.platform.bilibili.BilibiliAuthApiAndroid
-import dtv.mobile.platform.bilibili.BilibiliCookieStoreAndroid
-import dtv.mobile.platform.bilibili.BilibiliDanmakuClientAndroid
-import dtv.mobile.platform.bilibili.BilibiliLiveListApiAndroid
-import dtv.mobile.platform.bilibili.BilibiliSearchApiAndroid
-import dtv.mobile.platform.bilibili.BilibiliStreamUrlResolverAndroid
-import dtv.mobile.platform.douyin.DouyinWebApiAndroid
-import dtv.mobile.platform.douyin.DouyinDanmakuClientAndroid
+import dtv.mobile.platform.bilibili.BilibiliAuthApiIos
+import dtv.mobile.platform.bilibili.BilibiliCookieStoreIos
+import dtv.mobile.platform.bilibili.BilibiliDanmakuClientIos
+import dtv.mobile.platform.bilibili.BilibiliLiveListApiIos
+import dtv.mobile.platform.bilibili.BilibiliSearchApiIos
+import dtv.mobile.platform.bilibili.BilibiliStreamUrlResolverIos
+import dtv.mobile.platform.douyin.DouyinDanmakuClientIos
+import dtv.mobile.platform.douyin.DouyinWebApiIos
 import dtv.mobile.platform.douyu.DouyuCate2DirectoryApi
 import dtv.mobile.platform.douyu.DouyuCate3DirectoryApi
 import dtv.mobile.platform.douyu.DouyuCategoriesApi
+import dtv.mobile.platform.douyu.DouyuDanmakuClientIos
 import dtv.mobile.platform.douyu.DouyuMobileApi
-import dtv.mobile.platform.douyu.DouyuDanmakuClientAndroid
-import dtv.mobile.platform.douyu.DouyuSearchApiAndroid
+import dtv.mobile.platform.douyu.DouyuSearchApiIos
 import dtv.mobile.platform.douyu.DouyuThreeCateApi
-import dtv.mobile.platform.douyu.DouyuStreamUrlResolverAndroid
-import dtv.mobile.platform.huya.HuyaDanmakuClientAndroid
-import dtv.mobile.platform.huya.HuyaLiveListApiAndroid
-import dtv.mobile.platform.huya.HuyaSearchApiAndroid
-import dtv.mobile.platform.huya.HuyaStreamUrlResolverAndroid
+import dtv.mobile.platform.douyu.DouyuStreamUrlResolverIos
+import dtv.mobile.platform.huya.HuyaDanmakuClientIos
+import dtv.mobile.platform.huya.HuyaLiveListApiIos
+import dtv.mobile.platform.huya.HuyaSearchApiIos
+import dtv.mobile.platform.huya.HuyaStreamUrlResolverIos
 import dtv.mobile.repo.BilibiliCate1
-import dtv.mobile.repo.BilibiliCate2
 import dtv.mobile.repo.BilibiliQrCode
 import dtv.mobile.repo.BilibiliQrPollResult
+import dtv.mobile.repo.DanmakuMessage
 import dtv.mobile.repo.DouyinCate1
-import dtv.mobile.repo.DouyinCate2
 import dtv.mobile.repo.DouyuCate1
 import dtv.mobile.repo.DouyuCate2
 import dtv.mobile.repo.DouyuCate3
 import dtv.mobile.repo.DouyuCategories
 import dtv.mobile.repo.DouyuPlayInfo
 import dtv.mobile.repo.DtvRepository
-import dtv.mobile.repo.DanmakuMessage
 import dtv.mobile.repo.FollowInfoApi
+import dtv.mobile.repo.HuyaCate1
+import dtv.mobile.repo.PagedResult
+import dtv.mobile.repo.fake.FakeDtvRepository
 import dtv.mobile.repo.parseBilibiliCategoriesBundle
 import dtv.mobile.repo.parseDouyinCategoriesBundle
 import dtv.mobile.repo.parseHuyaCategoriesBundle
-import dtv.mobile.repo.HuyaCate1
-import dtv.mobile.repo.HuyaCate2
-import dtv.mobile.repo.PagedResult
-import dtv.mobile.repo.fake.FakeDtvRepository
+import dtv.mobile.util.AppLog
 import dtv.mobile.util.formatViewerCountWanIfNeeded
 import dtv.mobile.util.normalizeHttpUrl
 import io.ktor.client.request.get
-import io.ktor.client.request.headers
 import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.longOrNull
 
-class AndroidDtvRepository(
-  private val appContext: Context,
-) : DtvRepository {
+class IOSDtvRepository : DtvRepository {
   private val client = createHttpClient()
   private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
@@ -73,24 +61,24 @@ class AndroidDtvRepository(
   private val douyuThreeCateApi = DouyuThreeCateApi(client)
   private val douyuCate2DirectoryApi = DouyuCate2DirectoryApi(client)
   private val douyuCate3DirectoryApi = DouyuCate3DirectoryApi(client)
-  private val douyuStreamResolver = DouyuStreamUrlResolverAndroid(appContext, client)
-  private val douyuDanmakuClient = DouyuDanmakuClientAndroid()
-  private val douyuSearchApi = DouyuSearchApiAndroid(client)
+  private val douyuStreamResolver = DouyuStreamUrlResolverIos(client)
+  private val douyuDanmakuClient = DouyuDanmakuClientIos()
+  private val douyuSearchApi = DouyuSearchApiIos(client)
 
-  private val huyaLiveListApi = HuyaLiveListApiAndroid(client)
-  private val huyaStreamResolver = HuyaStreamUrlResolverAndroid(client)
-  private val huyaDanmakuClient = HuyaDanmakuClientAndroid()
-  private val huyaSearchApi = HuyaSearchApiAndroid(client)
+  private val huyaLiveListApi = HuyaLiveListApiIos(client)
+  private val huyaStreamResolver = HuyaStreamUrlResolverIos(client)
+  private val huyaDanmakuClient = HuyaDanmakuClientIos(client)
+  private val huyaSearchApi = HuyaSearchApiIos(client)
 
-  private val douyinWebApi = DouyinWebApiAndroid(client)
-  private val douyinDanmakuClient = DouyinDanmakuClientAndroid(appContext, douyinWebApi)
+  private val douyinWebApi = DouyinWebApiIos(client)
+  private val douyinDanmakuClient = DouyinDanmakuClientIos(douyinWebApi, client)
 
-  private val bilibiliCookieStore = BilibiliCookieStoreAndroid(appContext)
-  private val bilibiliAuthApi = BilibiliAuthApiAndroid(client, bilibiliCookieStore)
-  private val bilibiliLiveListApi = BilibiliLiveListApiAndroid(client)
-  private val bilibiliStreamResolver = BilibiliStreamUrlResolverAndroid(client) { bilibiliCookieStore.getCookie() }
-  private val bilibiliSearchApi = BilibiliSearchApiAndroid(client, bilibiliCookieStore)
-  private val bilibiliDanmakuClient = BilibiliDanmakuClientAndroid(
+  private val bilibiliCookieStore = BilibiliCookieStoreIos()
+  private val bilibiliAuthApi = BilibiliAuthApiIos(client, bilibiliCookieStore)
+  private val bilibiliLiveListApi = BilibiliLiveListApiIos(client)
+  private val bilibiliStreamResolver = BilibiliStreamUrlResolverIos(client) { bilibiliCookieStore.getCookie() }
+  private val bilibiliSearchApi = BilibiliSearchApiIos(client, bilibiliCookieStore)
+  private val bilibiliDanmakuClient = BilibiliDanmakuClientIos(
     httpClient = client,
     cookieProvider = { bilibiliCookieStore.getCookie() },
   )
@@ -189,7 +177,7 @@ class AndroidDtvRepository(
 
       Platform.Douyin -> runCatching {
         val info = douyinWebApi.fetchRoomEnter(roomId)
-        val isLive = (info.hlsPullUrlMap.isNotEmpty() || info.flvPullUrlMap.isNotEmpty())
+        val isLive = info.hlsPullUrlMap.isNotEmpty() || info.flvPullUrlMap.isNotEmpty()
         streamer.copy(
           name = info.anchorName?.trim()?.ifBlank { null } ?: streamer.name,
           title = info.title?.trim()?.ifBlank { null } ?: streamer.title,
@@ -240,7 +228,6 @@ class AndroidDtvRepository(
           )
         }.toMutableList()
 
-        // 与桌面端 Rust 保持一致：娱乐天地(cate1Id=2) 下硬编码加入“一起看”
         if (c1.cate1Id == 2) {
           c2List.add(
             DouyuCate2(
@@ -279,7 +266,6 @@ class AndroidDtvRepository(
 
   override suspend fun fetchDouyuLiveListByCate2(cate2Id: String, offset: Int, limit: Int): PagedResult<Streamer> {
     return runCatching {
-      // Douyu 的 `m.douyu.com/hgapi/.../newRecList` 近期经常返回 “系统异常”，改用网页目录接口 mixListV1 更稳定。
       val page = (offset / limit) + 1
       val resp = douyuCate2DirectoryApi.fetchMixListV1(cate2Id = cate2Id, page = page, limit = limit)
       if (resp.code != 0) return PagedResult(emptyList(), total = null)
@@ -335,22 +321,19 @@ class AndroidDtvRepository(
     return runCatching {
       douyuStreamResolver.resolve(roomId = roomId, quality = quality, cdn = cdn)
     }
-      .onSuccess { AppLog.i("DTV-Douyu", "resolved stream url roomId=$roomId quality=$quality cdn=$cdn url=$it") }
-      .onFailure { AppLog.e("DTV-Douyu", "resolve stream url failed roomId=$roomId quality=$quality cdn=$cdn", it) }
+      .onSuccess { AppLog.i("DTV-Douyu", "resolved hls url roomId=$roomId url=$it") }
+      .onFailure { AppLog.e("DTV-Douyu", "resolve stream url failed roomId=$roomId", it) }
       .getOrThrow()
   }
 
-  override fun observeDouyuDanmaku(roomId: String): Flow<DanmakuMessage> {
-    return douyuDanmakuClient.observe(roomId)
-  }
+  override fun observeDouyuDanmaku(roomId: String): Flow<DanmakuMessage> =
+    douyuDanmakuClient.observe(roomId)
 
-  override fun observeHuyaDanmaku(roomId: String): Flow<DanmakuMessage> {
-    return huyaDanmakuClient.observe(roomId)
-  }
+  override fun observeHuyaDanmaku(roomId: String): Flow<DanmakuMessage> =
+    huyaDanmakuClient.observe(roomId)
 
-  override fun observeDouyinDanmaku(webRid: String): Flow<DanmakuMessage> {
-    return douyinDanmakuClient.observe(webRid)
-  }
+  override fun observeDouyinDanmaku(webRid: String): Flow<DanmakuMessage> =
+    douyinDanmakuClient.observe(webRid)
 
   override suspend fun fetchHuyaLiveList(gid: String, page: Int, limit: Int): PagedResult<Streamer> {
     return runCatching {
@@ -373,7 +356,6 @@ class AndroidDtvRepository(
     msToken: String,
   ): PagedResult<Streamer> {
     return runCatching {
-      AppLog.i("DTV-Douyin", "fetch partition list partition=$partition type=$partitionType offset=$offset limit=$limit")
       val resp = douyinWebApi.fetchPartitionRooms(
         partition = partition,
         partitionType = partitionType,
@@ -393,10 +375,8 @@ class AndroidDtvRepository(
           isLive = true,
         )
       }
-      AppLog.i("DTV-Douyin", "fetch partition list ok partition=$partition offset=$offset got=${items.size} hasMore=${resp.hasMore}")
       PagedResult(items = items, total = null)
-    }.getOrElse { err ->
-      AppLog.e("DTV-Douyin", "fetch partition live list failed partition=$partition type=$partitionType offset=$offset", err)
+    }.getOrElse {
       PagedResult(items = emptyList(), total = null)
     }
   }
@@ -423,9 +403,8 @@ class AndroidDtvRepository(
 
       val hlsFallback = room.hlsPullUrlMap["ORIGIN"] ?: room.hlsPullUrlMap.values.firstOrNull()
       val flvFallback = room.flvPullUrlMap["ORIGIN"] ?: room.flvPullUrlMap.values.firstOrNull()
-      // Mobile reality: some Douyin FLV streams may be H.265-in-FLV which Media3/ExoPlayer may not render
-      // (audio-only on many devices). Prefer HLS first; fallback to FLV.
-      (hls ?: hlsFallback ?: flv ?: flvFallback) ?: error("未找到抖音播放地址")
+      // AVPlayer supports HLS only.
+      (hls ?: hlsFallback) ?: error("未找到抖音HLS播放地址")
     }
       .onFailure { AppLog.e("DTV-Douyin", "resolve stream url failed webRid=$webRid", it) }
       .getOrThrow()
@@ -435,8 +414,7 @@ class AndroidDtvRepository(
     return runCatching {
       val items = bilibiliLiveListApi.fetchLiveList(parentAreaId = parentAreaId, areaId = areaId, page = page, pageSize = pageSize)
       PagedResult(items = items, total = null)
-    }.getOrElse { err ->
-      AppLog.e("DTV-Bilibili", "fetch live list failed parent=$parentAreaId area=$areaId page=$page", err)
+    }.getOrElse {
       PagedResult(items = emptyList(), total = null)
     }
   }
@@ -447,19 +425,15 @@ class AndroidDtvRepository(
       .getOrThrow()
   }
 
-  override fun observeBilibiliDanmaku(roomId: String): Flow<DanmakuMessage> = bilibiliDanmakuClient.observe(roomId)
+  override fun observeBilibiliDanmaku(roomId: String): Flow<DanmakuMessage> =
+    bilibiliDanmakuClient.observe(roomId)
 
-  override suspend fun generateBilibiliQrCode(): BilibiliQrCode {
-    return bilibiliAuthApi.generateQrCode()
-  }
+  override suspend fun generateBilibiliQrCode(): BilibiliQrCode = bilibiliAuthApi.generateQrCode()
 
-  override suspend fun pollBilibiliQrCode(qrcodeKey: String): BilibiliQrPollResult {
-    return bilibiliAuthApi.pollQrCode(qrcodeKey)
-  }
+  override suspend fun pollBilibiliQrCode(qrcodeKey: String): BilibiliQrPollResult =
+    bilibiliAuthApi.pollQrCode(qrcodeKey)
 
-  override suspend fun getBilibiliCookie(): String? {
-    return bilibiliCookieStore.getCookie()
-  }
+  override suspend fun getBilibiliCookie(): String? = bilibiliCookieStore.getCookie()
 
   override suspend fun mergeBilibiliCookie(cookieHeader: String) {
     bilibiliCookieStore.mergeFromCookieHeader(cookieHeader)

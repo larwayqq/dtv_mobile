@@ -84,7 +84,7 @@ fun BilibiliHomeScreen(
     }
     if (!hasMore) return
     if (reset) loading = true else loadingMore = true
-    val startMs = if (reset && !hadItems) System.currentTimeMillis() else 0L
+    val startMs = if (reset && !hadItems) dtv.mobile.util.currentTimeMillis() else 0L
 
     val resp: PagedResult<Streamer> = appState.repo.fetchBilibiliLiveList(
       parentAreaId = cate2.parentAreaId,
@@ -105,7 +105,7 @@ fun BilibiliHomeScreen(
     hasMore = incoming.isNotEmpty() && addedCount > 0
     page += 1
     if (reset && !hadItems) {
-      val elapsed = System.currentTimeMillis() - startMs
+      val elapsed = dtv.mobile.util.currentTimeMillis() - startMs
       val remaining = 180L - elapsed
       if (remaining > 0) delay(remaining)
     }

@@ -1341,13 +1341,13 @@ private fun ScrollingDanmakuOverlay(
         val user = msg.user.trim().ifBlank { "匿名" }
         val content = msg.content.trim()
         if (content.isNotEmpty()) {
-          val now = System.nanoTime() / 1_000_000L
+          val now = dtv.mobile.util.nanoTime() / 1_000_000L
           val track = chooseTrack(now)
           if (track != null) {
             if (active.size >= maxActive) active.removeAt(0)
             active.add(
               Active(
-                id = System.nanoTime(),
+                id = dtv.mobile.util.nanoTime(),
                 user = user,
                 content = content,
                 track = track,
