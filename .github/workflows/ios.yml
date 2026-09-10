@@ -53,14 +53,21 @@ jobs:
 
       - name: Build app (no code signing)
         run: |
-          set -o pipefail
+          set +e
           xcodebuild \
             -project iosApp/DtvMobile.xcodeproj \
             -scheme DtvMobile \
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -derivedDataPath iosApp/build \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO | xcpretty
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            2>&1 | tee "$RUNNER_TEMP/xcodebuild.log" | xcpretty
+          status=${PIPESTATUS[0]}
+          if [ $status -ne 0 ]; then
+            echo "===== RAW ERRORS BELOW ====="
+            grep -nE "error:|actool|Asset Catalog" "$RUNNER_TEMP/xcodebuild.log" | tail -80 || true
+          fi
+          exit $status
 
       - name: Locate .app product
         id: app
