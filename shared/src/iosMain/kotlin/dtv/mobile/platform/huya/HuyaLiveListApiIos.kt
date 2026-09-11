@@ -29,9 +29,7 @@ class HuyaLiveListApiIos(
 
   suspend fun fetchLiveList(gid: String, page: Int, pageSize: Int): List<Streamer> {
     val url = "https://live.huya.com/liveHttpUI/getLiveList?iGid=$gid&iPageNo=$page&iPageSize=$pageSize"
-    val text = client.get(url) {
-      headers { append("User-Agent", "Mozilla/5.0") }
-    }.bodyAsText()
+    val text = client.get(url).bodyAsText()
 
     val root = json.parseToJsonElement(text).jsonObject
     val vList = (root["vList"] ?: root["data"]?.jsonObject?.get("vList"))?.jsonArray ?: return emptyList()

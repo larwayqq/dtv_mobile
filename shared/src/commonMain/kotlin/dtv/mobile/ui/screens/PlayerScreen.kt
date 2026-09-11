@@ -90,6 +90,7 @@ import dtv.mobile.ui.components.NetworkImage
 import dtv.mobile.ui.player.StreamPlayer
 import dtv.mobile.ui.system.FullscreenEffect
 import dtv.mobile.ui.system.PlatformBackHandler
+import dtv.mobile.util.AppLog
 import dtv.mobile.util.normalizeHttpUrl
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -173,11 +174,8 @@ fun PlayerScreen(
         runCatching { appState.repo.resolveDouyuStreamUrl(roomId = s.roomId) }
           .onSuccess { url = it }
           .onFailure { error = it.message ?: "获取播放地址失败" }
-        runCatching { appState.repo.fetchDouyuPlayInfo(roomId = s.roomId) }
-          .onSuccess { playInfo = it }
-          .onFailure {
-            if (url == null && error == null) error = it.message ?: "获取清晰度信息失败"
-          }
+        // fetchDouyuPlayInfo (JS-signed quality/CDN list) is loaded separately
+        // so a JSContext hang or crash never blocks playback startup.
       }
       Platform.Huya -> {
         runCatching { appState.repo.resolveHuyaStreamUrl(roomId = s.roomId) }
@@ -199,6 +197,16 @@ fun PlayerScreen(
       }
     }
     loading = false
+  }
+
+  // Load Douyu play info (qualities/CDNs) asynchronously — must not block
+  // playback. If JSContext fails or hangs the player is already running.
+  LaunchedEffect(streamer?.roomId, streamer?.platform) {
+    val s = streamer ?: return@LaunchedEffect
+    if (s.platform != Platform.Douyu || !s.isLive) return@LaunchedEffect
+    runCatching { appState.repo.fetchDouyuPlayInfo(roomId = s.roomId) }
+      .onSuccess { playInfo = it }
+      .onFailure { AppLog.e("DTV-Douyu", "fetchPlayInfo failed (non-blocking)", it) }
   }
 
   val blockKeywordsLower by remember {
