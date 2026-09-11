@@ -46,19 +46,25 @@ jobs:
         run: |
           chmod +x ./gradlew
           set +e
-          ./gradlew :shared:linkReleaseFrameworkIosArm64 --no-daemon 2>&1 | tee "$RUNNER_TEMP/framework.log"
-          status=${PIPESTATUS[0]}
-          echo "gradle exit status=$status"
-          exit $status
+          # Keep this step's console output tiny (GitHub truncates the whole
+          # job log past ~1MB); full output goes to a file parsed on failure.
+          ./gradlew :shared:linkReleaseFrameworkIosArm64 --no-daemon \
+            > "$RUNNER_TEMP/framework.log" 2>&1
+          status=$?
+          echo "gradle exit status=$status, log bytes=$(wc -c < "$RUNNER_TEMP/framework.log")"
+          if [ $status -ne 0 ]; then
+            echo "BUILD FAILED — see 'Extract Kotlin compile errors' step"
+            exit 1
+          fi
 
       - name: Extract Kotlin compile errors
         if: failure()
         shell: bash
         run: |
           echo "===== KOTLIN/COMPILE ERROR LINES ====="
-          grep -aE "^e: |: error: |error: " "$RUNNER_TEMP/framework.log" | sort -u | head -120 || true
+          grep -aE "^e: |^w: |: error: | error: " "$RUNNER_TEMP/framework.log" | sort -u | head -150 || true
           echo "===== TAIL ====="
-          tail -60 "$RUNNER_TEMP/framework.log" || true
+          tail -80 "$RUNNER_TEMP/framework.log" || true
 
       - name: Prepare app icon (1024x1024)
         run: |
