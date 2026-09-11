@@ -1,9 +1,10 @@
 package dtv.mobile.platform.douyu
 
 import dtv.mobile.util.readBundleAssetText
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.autoreleasepool
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import platform.objc.autoreleasepool
 import platform.JavaScriptCore.JSContext
 import platform.JavaScriptCore.JSValue
 
@@ -17,6 +18,7 @@ import platform.JavaScriptCore.JSValue
  * explicit autorelease pool.
  */
 class DouyuJsSignerIos {
+  @OptIn(ExperimentalForeignApi::class)
   suspend fun signParams(
     homeH5EncScript: String,
     roomId: String,

@@ -2,9 +2,10 @@ package dtv.mobile.platform.douyin
 
 import dtv.mobile.util.md5Hex
 import dtv.mobile.util.readBundleAssetText
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.autoreleasepool
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import platform.objc.autoreleasepool
 import platform.JavaScriptCore.JSContext
 
 /**
@@ -53,6 +54,7 @@ internal class DouyinWebMsdkSignatureIos {
     return md5Hex(toSign)
   }
 
+  @OptIn(ExperimentalForeignApi::class)
   suspend fun signature(roomId: String, userUniqueId: String, webcastSdkVersion: String, userAgent: String): String {
     val stub = msStub(roomId = roomId, userUniqueId = userUniqueId, webcastSdkVersion = webcastSdkVersion)
     val js = readBundleAssetText(WEB_MSSDK_JS_RESOURCE)
