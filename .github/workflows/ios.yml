@@ -61,10 +61,28 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          echo "===== KOTLIN/COMPILE ERROR LINES ====="
-          grep -aE "^e: |^w: |: error: | error: " "$RUNNER_TEMP/framework.log" | sort -u | head -150 || true
-          echo "===== TAIL ====="
-          tail -80 "$RUNNER_TEMP/framework.log" || true
+          LOG="$RUNNER_TEMP/framework.log"
+          echo "## Kotlin/Native build failure" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "### Error lines"
+            echo '```'
+            grep -aE "^e: |^w: " "$LOG" | sort -u | head -60 || true
+            echo '```'
+            echo "### Log tail"
+            echo '```'
+            tail -80 "$LOG" || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          # Emit each error as a GitHub annotation (readable via anonymous
+          # check-run annotations API), escaping workflow-command specials.
+          grep -aE "^e: " "$LOG" | sort -u | head -20 | while IFS= read -r line; do
+            m="${line//%/%25}"
+            m="${m//,/%2C}"
+            m="${m//:/%3A}"
+            m="${m//$'\r'/ }"
+            echo "::error::$m"
+          done
+          exit 0
 
       - name: Prepare app icon (1024x1024)
         run: |
