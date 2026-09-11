@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import dtv.mobile.model.Platform
 import dtv.mobile.state.AppState
@@ -11,12 +12,21 @@ import dtv.mobile.ui.screens.bilibili.BilibiliHomeScreen
 import dtv.mobile.ui.screens.douyin.DouyinHomeScreen
 import dtv.mobile.ui.screens.douyu.DouyuHomeScreen
 import dtv.mobile.ui.screens.huya.HuyaHomeScreen
+import kotlinx.coroutines.delay
 
 @Composable
 fun PlatformScreen(
   appState: AppState,
   modifier: Modifier = Modifier,
 ) {
+  // Safety net: never leave the bottom tabs permanently disabled if a
+  // platform screen fails to clear platformSwitchLoading for any reason.
+  LaunchedEffect(appState.selectedPlatform) {
+    appState.platformSwitchLoading = true
+    delay(8_000)
+    appState.platformSwitchLoading = false
+  }
+
   val subscribedForPlatform = appState.subscribedPartitions.filter { it.platform == appState.selectedPlatform }
   if (appState.simpleModeForSelectedPlatform && subscribedForPlatform.isNotEmpty()) {
     SimpleModePlatformScreen(
