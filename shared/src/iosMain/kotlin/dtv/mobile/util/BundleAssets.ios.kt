@@ -2,7 +2,6 @@ package dtv.mobile.util
 
 import dtv_mobile.shared.generated.resources.Res
 import org.jetbrains.compose.resources.ExperimentalResourceApi
-import org.jetbrains.compose.resources.readBytes
 import platform.Foundation.NSBundle
 import platform.Foundation.NSFileManager
 
