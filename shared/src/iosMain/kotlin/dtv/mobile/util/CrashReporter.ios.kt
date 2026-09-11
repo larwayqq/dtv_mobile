@@ -13,7 +13,6 @@ import platform.posix.SIGSEGV
 import platform.posix.SIGTRAP
 import platform.posix.signal
 import kotlin.native.setUnhandledExceptionHook
-import kotlin.native.stackToString
 
 private const val KEY_KOTLIN = "dtv_crash_kotlin"
 private const val KEY_OBJC = "dtv_crash_objc"
@@ -61,7 +60,7 @@ fun installCrashReporting() {
 
   setUnhandledExceptionHook { throwable ->
     defaults.setObject(
-      "${throwable::class.simpleName}: ${throwable.message}\n${throwable.stackToString()}",
+      throwable.stackTraceToString().take(20_000),
       forKey = KEY_KOTLIN,
     )
     defaults.synchronize()

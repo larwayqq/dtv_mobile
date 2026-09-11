@@ -4,7 +4,7 @@ import dtv.mobile.util.md5Hex
 import dtv.mobile.util.readBundleAssetText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import platform.Foundation.autoreleasepool
+import platform.objc.autoreleasepool
 import platform.JavaScriptCore.JSContext
 
 /**
