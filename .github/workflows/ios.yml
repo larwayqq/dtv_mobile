@@ -13,6 +13,8 @@ jobs:
     name: Build unsigned IPA (iOS arm64)
     runs-on: macos-15
     timeout-minutes: 60
+    permissions:
+      contents: write
 
     env:
       GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8"
@@ -148,3 +150,15 @@ jobs:
           name: DtvMobile-0.1.1-unsigned-ipa
           path: DtvMobile-0.1.1-unsigned.ipa
           retention-days: 30
+
+      # Publish to a rolling prerelease so the unsigned IPA is downloadable
+      # anonymously via a stable release-asset URL.
+      - name: Publish IPA to dev release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create dev-ios DtvMobile-0.1.1-unsigned.ipa \
+            --title "iOS dev build (unsigned)" \
+            --notes "commit ${{ github.sha }}" \
+            --prerelease \
+            || gh release upload dev-ios DtvMobile-0.1.1-unsigned.ipa --clobber
