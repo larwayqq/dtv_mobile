@@ -121,3 +121,12 @@ targets:
               exit 1
             fi
           fi
+          # Also mirror resources into the embedded framework so the iOS
+          # runtime can locate them via NSBundle.allFrameworks as a fallback.
+          if [ -d "$FW_DIR" ]; then
+            rm -rf "$FW_DIR/compose-resources"
+            cp -R "$DEST/compose-resources" "$FW_DIR/compose-resources" || true
+            echo "mirrored compose-resources into shared.framework"
+          fi
+          echo "resource listing:"
+          find "$DEST/compose-resources" -maxdepth 2 -type f | head -20 || true

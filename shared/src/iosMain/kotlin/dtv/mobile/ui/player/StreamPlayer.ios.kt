@@ -79,7 +79,15 @@ private class PlayerContainerView : UIView(frame = CGRectMake(0.0, 0.0, 0.0, 0.0
     configuredUrl = url
     onErrorCallback = onError
     onAspectCallback = onVideoAspectRatioChanged
+    try {
+      configureInternal(url, zoomToFill)
+    } catch (t: Throwable) {
+      AppLog.e("DTV-Player", "player configure failed url=$url", t)
+      onErrorCallback?.invoke(t.message ?: "播放器初始化失败")
+    }
+  }
 
+  private fun configureInternal(url: String, zoomToFill: Boolean) {
     playerLayer.videoGravity =
       if (zoomToFill) AVLayerVideoGravityResizeAspectFill else AVLayerVideoGravityResizeAspect
 
@@ -98,6 +106,7 @@ private class PlayerContainerView : UIView(frame = CGRectMake(0.0, 0.0, 0.0, 0.0
     }
 
     val nsUrl = NSURL(string = url)
+      ?: throw IllegalArgumentException("invalid play url: ${url.take(120)}")
     val asset = AVURLAsset(
       uRL = nsUrl,
       options = mapOf<Any?, Any?>("AVURLAssetHTTPHeaderFieldsKey" to headers),

@@ -70,6 +70,8 @@ fun BilibiliHomeScreen(
   var hasMore by remember { mutableStateOf(true) }
   var page by remember { mutableIntStateOf(1) }
   var refreshing by remember { mutableStateOf(false) }
+  var categoriesError by remember { mutableStateOf(false) }
+  var listError by remember { mutableStateOf(false) }
 
   val gridState = rememberLazyGridState()
   val scope = rememberCoroutineScope()
@@ -93,6 +95,7 @@ fun BilibiliHomeScreen(
       pageSize = PAGE_SIZE,
     )
     val incoming = resp.items
+    if (reset) listError = false
     val old = rooms
     val (merged, addedCount) = if (reset) {
       incoming to incoming.size
@@ -103,6 +106,7 @@ fun BilibiliHomeScreen(
     }
     rooms = merged
     hasMore = incoming.isNotEmpty() && addedCount > 0
+    if (reset) listError = merged.isEmpty()
     page += 1
     if (reset && !hadItems) {
       val elapsed = dtv.mobile.util.currentTimeMillis() - startMs
@@ -113,8 +117,9 @@ fun BilibiliHomeScreen(
     if (reset) appState.platformSwitchLoading = false
   }
 
-  LaunchedEffect(Unit) {
+  suspend fun loadCategories() {
     loading = true
+    categoriesError = false
     val data = appState.repo.fetchBilibiliCategories()
     categories = data
 
@@ -137,6 +142,19 @@ fun BilibiliHomeScreen(
 
     selectedCate1 = saved?.first ?: data.firstOrNull()
     selectedCate2 = saved?.second ?: selectedCate1?.cate2List?.firstOrNull()
+    categoriesError = data.isEmpty()
+    if (data.isEmpty() || selectedCate2 == null) {
+      loading = false
+      appState.platformSwitchLoading = false
+    }
+  }
+
+  LaunchedEffect(Unit) {
+    runCatching { loadCategories() }.onFailure {
+      categoriesError = true
+      loading = false
+      appState.platformSwitchLoading = false
+    }
   }
 
   LaunchedEffect(selectedCate2?.parentAreaId, selectedCate2?.areaId) {
@@ -268,11 +286,36 @@ fun BilibiliHomeScreen(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
       ) {
-        if (loading || appState.platformSwitchLoading) {
-          items(6, span = { GridItemSpan(1) }) {
-            StreamerCardSkeleton()
+        when {
+          loading || appState.platformSwitchLoading -> {
+            items(6, span = { GridItemSpan(1) }) {
+              StreamerCardSkeleton()
+            }
           }
-        } else {
+          categoriesError -> {
+            item(span = { GridItemSpan(2) }) {
+              dtv.mobile.ui.components.LoadErrorState(
+                message = "B站分区加载失败（内置资源读取异常），请重试",
+                onRetry = { scope.launch { runCatching { loadCategories() } } },
+              )
+            }
+          }
+          listError -> {
+            item(span = { GridItemSpan(2) }) {
+              dtv.mobile.ui.components.LoadErrorState(
+                message = "房间列表为空或加载失败，请重试",
+                onRetry = {
+                  scope.launch {
+                    runCatching {
+                      loadPage(reset = true)
+                      gridState.scrollToItem(0)
+                    }
+                  }
+                },
+              )
+            }
+          }
+          else -> {
           items(rooms.size, key = { rooms[it].roomId }, span = { GridItemSpan(1) }) { index ->
             val streamer = rooms[index]
             StreamerCard(
@@ -289,6 +332,7 @@ fun BilibiliHomeScreen(
               hasMore -> Text("继续滑动加载更多", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f))
               else -> Spacer(modifier = Modifier.height(12.dp))
             }
+          }
           }
         }
       }

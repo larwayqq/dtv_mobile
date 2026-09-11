@@ -61,6 +61,8 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.tween
 import dtv.mobile.model.Platform
 import dtv.mobile.ui.components.BilibiliWebLoginSheet
+import dtv.mobile.ui.components.DiagnosticOverlay
+import androidx.compose.foundation.layout.Box
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -176,45 +178,48 @@ fun RootScaffold(appState: AppState) {
       }
     },
   ) { padding ->
-    AnimatedContent(
-      targetState = appState.currentScreen,
-      transitionSpec = {
-        val enteringPlayer = targetState == Screen.Player && initialState != Screen.Player
-        val leavingPlayer = initialState == Screen.Player && targetState != Screen.Player
-        when {
-          enteringPlayer -> (slideInHorizontally(animationSpec = tween(240)) { it / 6 } + fadeIn(animationSpec = tween(240)))
-            .togetherWith(fadeOut(animationSpec = tween(120)))
-          leavingPlayer -> fadeIn(animationSpec = tween(120))
-            .togetherWith(slideOutHorizontally(animationSpec = tween(240)) { it / 6 } + fadeOut(animationSpec = tween(240)))
-          else -> fadeIn(animationSpec = tween(140)).togetherWith(fadeOut(animationSpec = tween(140)))
+    Box(modifier = Modifier.fillMaxSize()) {
+      AnimatedContent(
+        targetState = appState.currentScreen,
+        transitionSpec = {
+          val enteringPlayer = targetState == Screen.Player && initialState != Screen.Player
+          val leavingPlayer = initialState == Screen.Player && targetState != Screen.Player
+          when {
+            enteringPlayer -> (slideInHorizontally(animationSpec = tween(240)) { it / 6 } + fadeIn(animationSpec = tween(240)))
+              .togetherWith(fadeOut(animationSpec = tween(120)))
+            leavingPlayer -> fadeIn(animationSpec = tween(120))
+              .togetherWith(slideOutHorizontally(animationSpec = tween(240)) { it / 6 } + fadeOut(animationSpec = tween(240)))
+            else -> fadeIn(animationSpec = tween(140)).togetherWith(fadeOut(animationSpec = tween(140)))
+          }
+        },
+        label = "screen",
+        modifier = Modifier.fillMaxSize(),
+      ) { screen ->
+        when (screen) {
+          Screen.Home -> HomeScreen(
+            modifier = Modifier.padding(padding),
+            appState = appState,
+          )
+          Screen.Platform -> PlatformScreen(
+            modifier = Modifier.padding(padding),
+            appState = appState,
+          )
+          Screen.Player -> PlayerScreen(
+            modifier = Modifier.padding(padding),
+            appState = appState,
+            streamer = appState.currentStreamer,
+          )
+          Screen.Search -> SearchScreen(
+            modifier = Modifier.padding(padding),
+            appState = appState,
+          )
+          Screen.Sync -> SyncScreen(
+            modifier = Modifier.padding(padding),
+            appState = appState,
+          )
         }
-      },
-      label = "screen",
-      modifier = Modifier.fillMaxSize(),
-    ) { screen ->
-      when (screen) {
-        Screen.Home -> HomeScreen(
-          modifier = Modifier.padding(padding),
-          appState = appState,
-        )
-        Screen.Platform -> PlatformScreen(
-          modifier = Modifier.padding(padding),
-          appState = appState,
-        )
-        Screen.Player -> PlayerScreen(
-          modifier = Modifier.padding(padding),
-          appState = appState,
-          streamer = appState.currentStreamer,
-        )
-        Screen.Search -> SearchScreen(
-          modifier = Modifier.padding(padding),
-          appState = appState,
-        )
-        Screen.Sync -> SyncScreen(
-          modifier = Modifier.padding(padding),
-          appState = appState,
-        )
       }
+      DiagnosticOverlay()
     }
   }
 }

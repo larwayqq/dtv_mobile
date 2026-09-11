@@ -4,6 +4,7 @@ import dtv.mobile.util.md5Hex
 import dtv.mobile.util.readBundleAssetText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import platform.Foundation.autoreleasepool
 import platform.JavaScriptCore.JSContext
 
 /**
@@ -52,29 +53,33 @@ internal class DouyinWebMsdkSignatureIos {
     return md5Hex(toSign)
   }
 
-  suspend fun signature(roomId: String, userUniqueId: String, webcastSdkVersion: String, userAgent: String): String =
-    withContext(Dispatchers.Default) {
-      val stub = msStub(roomId = roomId, userUniqueId = userUniqueId, webcastSdkVersion = webcastSdkVersion)
-      val js = readBundleAssetText(WEB_MSSDK_JS_RESOURCE)
+  suspend fun signature(roomId: String, userUniqueId: String, webcastSdkVersion: String, userAgent: String): String {
+    val stub = msStub(roomId = roomId, userUniqueId = userUniqueId, webcastSdkVersion = webcastSdkVersion)
+    val js = readBundleAssetText(WEB_MSSDK_JS_RESOURCE)
+    // JavaScriptCore contexts are pinned to their creating thread; keep all
+    // JSContext work on the main thread with an explicit autorelease pool.
+    return withContext(Dispatchers.Main) {
+      autoreleasepool {
+        val ctx = JSContext()
+        var jsError: String? = null
+        ctx.exceptionHandler = { _, ex -> jsError = ex?.toString() }
+        ctx.evaluateScript(js)
+        check(jsError == null) { "webmssdk load failed: $jsError" }
 
-      val ctx = JSContext()
-      var jsError: String? = null
-      ctx.exceptionHandler = { _, ex -> jsError = ex?.toString() }
-      ctx.evaluateScript(js)
-      check(jsError == null) { "webmssdk load failed: $jsError" }
-
-      var out = ""
-      repeat(12) {
-        val expr = "getMSSDKSignature(${stub.toJsStringLiteral()}, ${userAgent.toJsStringLiteral()})"
-        val v = ctx.evaluateScript(expr)?.toString().orEmpty().trim()
-        if (v.isNotBlank() && !v.contains('-') && !v.contains('=')) {
-          out = v
-          return@repeat
+        var out = ""
+        repeat(12) {
+          val expr = "getMSSDKSignature(${stub.toJsStringLiteral()}, ${userAgent.toJsStringLiteral()})"
+          val v = ctx.evaluateScript(expr)?.toString().orEmpty().trim()
+          if (v.isNotBlank() && !v.contains('-') && !v.contains('=')) {
+            out = v
+            return@repeat
+          }
         }
+        if (out.isBlank()) error("empty/invalid douyin WebMsSDK signature")
+        out
       }
-      if (out.isBlank()) error("empty/invalid douyin WebMsSDK signature")
-      out
     }
+  }
 
   private fun String.toJsStringLiteral(): String =
     buildString(this.length + 2) {

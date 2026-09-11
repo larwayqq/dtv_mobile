@@ -202,13 +202,19 @@ class IOSDtvRepository : DtvRepository {
   }
 
   override suspend fun fetchHuyaCategories(): List<HuyaCate1> =
-    runCatching { parseHuyaCategoriesBundle(json) }.getOrElse { emptyList() }
+    runCatching { parseHuyaCategoriesBundle(json) }.getOrElse {
+      dtv.mobile.util.Diagnostics.record("虎牙分类", it); emptyList()
+    }
 
   override suspend fun fetchBilibiliCategories(): List<BilibiliCate1> =
-    runCatching { parseBilibiliCategoriesBundle(json) }.getOrElse { emptyList() }
+    runCatching { parseBilibiliCategoriesBundle(json) }.getOrElse {
+      dtv.mobile.util.Diagnostics.record("B站分类", it); emptyList()
+    }
 
   override suspend fun fetchDouyinCategories(): List<DouyinCate1> =
-    runCatching { parseDouyinCategoriesBundle(json) }.getOrElse { emptyList() }
+    runCatching { parseDouyinCategoriesBundle(json) }.getOrElse {
+      dtv.mobile.util.Diagnostics.record("抖音分类", it); emptyList()
+    }
 
   override suspend fun fetchDouyuCategories(): DouyuCategories {
     return runCatching {
@@ -339,7 +345,10 @@ class IOSDtvRepository : DtvRepository {
     return runCatching {
       val items = huyaLiveListApi.fetchLiveList(gid = gid, page = page, pageSize = limit)
       PagedResult(items = items, total = null)
-    }.getOrElse { PagedResult(items = emptyList(), total = null) }
+    }.getOrElse {
+      dtv.mobile.util.Diagnostics.record("虎牙房间列表", it)
+      PagedResult(items = emptyList(), total = null)
+    }
   }
 
   override suspend fun resolveHuyaStreamUrl(roomId: String): String {
@@ -377,6 +386,7 @@ class IOSDtvRepository : DtvRepository {
       }
       PagedResult(items = items, total = null)
     }.getOrElse {
+      dtv.mobile.util.Diagnostics.record("抖音房间列表", it)
       PagedResult(items = emptyList(), total = null)
     }
   }
@@ -415,6 +425,7 @@ class IOSDtvRepository : DtvRepository {
       val items = bilibiliLiveListApi.fetchLiveList(parentAreaId = parentAreaId, areaId = areaId, page = page, pageSize = pageSize)
       PagedResult(items = items, total = null)
     }.getOrElse {
+      dtv.mobile.util.Diagnostics.record("B站房间列表", it)
       PagedResult(items = emptyList(), total = null)
     }
   }
