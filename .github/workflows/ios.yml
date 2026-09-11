@@ -42,9 +42,23 @@ jobs:
           xcodebuild -version
 
       - name: Build Kotlin/Native release framework
+        shell: bash
         run: |
           chmod +x ./gradlew
-          ./gradlew :shared:linkReleaseFrameworkIosArm64 --no-daemon --stacktrace
+          set +e
+          ./gradlew :shared:linkReleaseFrameworkIosArm64 --no-daemon 2>&1 | tee "$RUNNER_TEMP/framework.log"
+          status=${PIPESTATUS[0]}
+          echo "gradle exit status=$status"
+          exit $status
+
+      - name: Extract Kotlin compile errors
+        if: failure()
+        shell: bash
+        run: |
+          echo "===== KOTLIN/COMPILE ERROR LINES ====="
+          grep -aE "^e: |: error: |error: " "$RUNNER_TEMP/framework.log" | sort -u | head -120 || true
+          echo "===== TAIL ====="
+          tail -60 "$RUNNER_TEMP/framework.log" || true
 
       - name: Prepare app icon (1024x1024)
         run: |
