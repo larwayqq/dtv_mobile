@@ -90,7 +90,6 @@ import dtv.mobile.ui.components.NetworkImage
 import dtv.mobile.ui.player.StreamPlayer
 import dtv.mobile.ui.system.FullscreenEffect
 import dtv.mobile.ui.system.PlatformBackHandler
-import dtv.mobile.util.AppLog
 import dtv.mobile.util.normalizeHttpUrl
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -206,7 +205,7 @@ fun PlayerScreen(
     if (s.platform != Platform.Douyu || !s.isLive) return@LaunchedEffect
     runCatching { appState.repo.fetchDouyuPlayInfo(roomId = s.roomId) }
       .onSuccess { playInfo = it }
-      .onFailure { AppLog.e("DTV-Douyu", "fetchPlayInfo failed (non-blocking)", it) }
+      .onFailure { dtv.mobile.util.Diagnostics.record("斗鱼清晰度", it) }
   }
 
   val blockKeywordsLower by remember {
